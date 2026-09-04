@@ -10,21 +10,21 @@
   <img src="https://img.shields.io/badge/Rust-1.70%2B-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust 1.70+">
   <img src="https://img.shields.io/badge/Tests-425%20Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white" alt="Tests 425 Passing">
   <img src="https://img.shields.io/badge/Status-Beta%20%7C%20WIP-orange?style=flat-square" alt="Status Beta | WIP">
-  <img src="https://img.shields.io/badge/Export-MP4%20%7C%20WebM%20%7C%20Audio-0078D6?style=flat-square" alt="Export Formate">
+  <img src="https://img.shields.io/badge/Export-MP4%20%7C%20WebM%20%7C%20Audio-0078D6?style=flat-square" alt="Export Formats">
 </p>
 
 <p align="center">
-  <b>CLIPPING TOOL</b> ist ein leichtgewichtiges, blitzschnelles Windows-Screen- und Game-Capture-Tool für Gamer, Streamer und Content Creator.<br>
-  Nimm flüssiges Gameplay und Desktop-Aktivitäten mit minimaler CPU/GPU-Last auf – angetrieben von <b>Tauri 2</b>, <b>Rust</b> und Hardwarebeschleunigung (<b>WGC</b>, <b>NVENC/AMF/QSV</b>) inklusive nativem Low-Latency Multi-Source Audio.
+  <b>CLIPPING TOOL</b> is a lightweight, blazing-fast Windows screen and game capture application for gamers, streamers, and content creators.<br>
+  Record smooth gameplay and desktop activity with minimal CPU and GPU overhead — powered by <b>Tauri 2</b>, <b>Rust</b>, hardware acceleration (<b>WGC</b>, <b>NVENC/AMF/QSV</b>), and a native low-latency multi-source audio engine.
 </p>
 
 <p align="center">
   <a href="#-highlights--features">Features</a> •
-  <a href="#-wichtiger-hinweis-work-in-progress">Wichtiger Status</a> •
-  <a href="#-erste-schritte--getting-started">Quickstart</a> •
-  <a href="#%EF%B8%8F-tech-stack--architektur">Architektur</a> •
-  <a href="#-production-build-erstellen">Build</a> •
-  <a href="#-lizenz">Lizenz</a>
+  <a href="#-work-in-progress--known-status">Status</a> •
+  <a href="#-getting-started">Quickstart</a> •
+  <a href="#%EF%B8%8F-tech-stack--architecture">Architecture</a> •
+  <a href="#-building-for-production">Build</a> •
+  <a href="#-license">License</a>
 </p>
 
 ---
@@ -32,27 +32,27 @@
 </div>
 
 > [!WARNING]
-> ### ⚠️ Wichtiger Hinweis: Work in Progress
-> **Dieses Tool befindet sich derzeit noch in der aktiven Entwicklung und funktioniert noch nicht zu 100% fehlerfrei.**  
-> Es können unerwartete Bugs, Abstürze, Audio-/Video-Synchronisationsprobleme oder Randfall-Fehler auftreten. Feedback und Issues sind jederzeit herzlich willkommen!
+> ### ⚠️ Work in Progress / Beta Notice
+> **This tool is under active development and is not yet 100% bug-free.**  
+> You may encounter unexpected bugs, crashes, audio/video synchronization glitches, or unhandled edge cases. Feedback, bug reports, and contributions are always welcome!
 
 ---
 
 ## 🌟 Highlights & Features
 
-| Feature | Beschreibung |
+| Feature | Description |
 | :--- | :--- |
-| ⚡ **Leicht & Resourcenschonend** | Nahezu null Idle-Last dank Tauri 2 und nativer Rust-Engine |
-| 🎮 **Game- & Desktop-Capture** | Flüssige Aufnahme via Windows Graphics Capture (`WGC`) & Hardwarebeschleunigung |
-| 🔊 **Multi-Source Audio** | Low-Latency Audio-Engine (WASAPI / CPAL) für Systemsound, Mikrofon & App-Audio |
-| ✂️ **In-App Editor & Overlay** | Integriertes Trimming-Tool und interaktives In-Game-Overlay |
-| 🚀 **Auto-Tuning** | Automatische Erkennung der GPU- und Encoder-Fähigkeiten für optimale Settings |
-| ⌨️ **Hotkeys & Gamepads** | Globale Tastenkombinationen und Gamepad-Tasten-Mapping für sofortiges Clippen |
-| 📁 **Clip-Bibliothek** | Übersichtliche Clip-Verwaltung, verlustfreier Export und sicherer Papierkorb |
+| ⚡ **Lightweight & Resource-Friendly** | Near-zero idle resource usage powered by Tauri 2 and a native Rust engine |
+| 🎮 **Game & Desktop Capture** | Smooth recording via Windows Graphics Capture (`WGC`) & hardware acceleration |
+| 🔊 **Multi-Source Audio** | Low-latency audio engine (WASAPI / CPAL) supporting system audio, mic, & app streams |
+| ✂️ **In-App Editor & Overlay** | Built-in video trimming suite and an interactive in-game overlay |
+| 🚀 **Hardware Auto-Tuning** | Automated detection of GPU and encoder capabilities to select optimal settings |
+| ⌨️ **Hotkeys & Gamepads** | Global keybindings and gamepad trigger mapping for instantaneous clipping |
+| 📁 **Clip Library** | Organized clip management, lossless exports, and safe trash bin operations |
 
 ---
 
-## 🛠️ Tech Stack & Architektur
+## 🛠️ Tech Stack & Architecture
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -73,47 +73,47 @@
 
 - **Backend / Core Engine**: [Rust](https://www.rust-lang.org/) (Tauri 2, Tokio, Windows API, WASAPI, CPAL, Axum)
 - **Frontend / UI**: [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/)
-- **Media Processing**: FFmpeg & FFprobe Sidecars mit Hardware-Fallback
+- **Media Processing**: FFmpeg & FFprobe sidecars with hardware-accelerated fallback
 
 ---
 
-## 🚀 Erste Schritte / Getting Started
+## 🚀 Getting Started
 
-### 📋 Voraussetzungen
+### 📋 Prerequisites
 
-- **Betriebssystem**: Windows 10 / 11 (64-bit)
-- **Node.js**: v18+ (LTS empfohlen)
-- **Rust**: Aktuelle Stable-Toolchain über [rustup.rs](https://rustup.rs/)
+- **Operating System**: Windows 10 / 11 (64-bit)
+- **Node.js**: v18+ (LTS recommended)
+- **Rust**: Latest stable toolchain via [rustup.rs](https://rustup.rs/)
 - **Build Tools**: Visual Studio C++ Build Tools
 
-### 📦 Installation & Entwicklung
+### 📦 Installation & Development
 
-1. **Repository klonen**:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/razy-me/clipping-tool.git
    cd clipping-tool/clip-tool
    ```
 
-2. **Frontend-Abhängigkeiten installieren**:
+2. **Install frontend dependencies**:
    ```bash
    npm install
    ```
 
-3. **FFmpeg Sidecars bereitstellen**:
-   Stelle sicher, dass die Windows-Binärdateien von `ffmpeg` und `ffprobe` im Verzeichnis `src-tauri/bin/` mit dem passenden Target-Namen liegen:
+3. **Provide FFmpeg Sidecars**:
+   Ensure `ffmpeg` and `ffprobe` Windows binaries are placed inside `src-tauri/bin/` with their proper target names:
    - `ffmpeg-x86_64-pc-windows-msvc.exe`
    - `ffprobe-x86_64-pc-windows-msvc.exe`
 
-4. **Entwicklungsserver starten**:
+4. **Launch development server**:
    ```bash
    npm run tauri dev
    ```
 
 ---
 
-## 🧪 Tests durchführen
+## 🧪 Running Tests
 
-Führe die Rust-Backend-Testsuite aus (Unit Tests, DSP-Tests, Hardware-Profile, Codec-Fallbacks):
+Execute the Rust backend test suite (unit tests, DSP tests, hardware profiles, codec fallback):
 
 ```bash
 cd clip-tool/src-tauri
@@ -122,21 +122,20 @@ cargo test
 
 ---
 
-## 📦 Production Build erstellen
+## 📦 Building for Production
 
-Erstelle einen optimierten Release-Build (Installer und Executable):
+Create an optimized release build (installer and standalone executable):
 
 ```bash
 cd clip-tool
 npm run tauri build
 ```
 
-Die fertigen Binärdateien befinden sich anschließend unter:  
+Compiled binaries will be located at:  
 `clip-tool/src-tauri/target/release/`
 
 ---
 
-## 📄 Lizenz
+## 📄 License
 
-Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
-
+This project is licensed under the [MIT License](LICENSE).
