@@ -8,8 +8,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4c1?style=flat-square" alt="License MIT"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >=18.0.0">
   <img src="https://img.shields.io/badge/Rust-1.70%2B-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust 1.70+">
+  <img src="https://img.shields.io/badge/Tests-425%20Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white" alt="Tests 425 Passing">
   <img src="https://img.shields.io/badge/Status-Beta%20%7C%20WIP-orange?style=flat-square" alt="Status Beta | WIP">
-  <img src="https://img.shields.io/badge/Export-MP4%20%7C%20WebM%20%7C%20Audio-2ea44f?style=flat-square" alt="Export Formate">
+  <img src="https://img.shields.io/badge/Export-MP4%20%7C%20WebM%20%7C%20Audio-0078D6?style=flat-square" alt="Export Formate">
 </p>
 
 <p align="center">
