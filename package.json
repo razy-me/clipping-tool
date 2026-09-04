@@ -1,0 +1,10 @@
+{
+  "name": "cliping-tool-wrapper",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix clip-tool run dev",
+    "build": "npm --prefix clip-tool run build",
+    "preview": "npm --prefix clip-tool run preview",
+    "tauri": "npm --prefix clip-tool run tauri --"
+  }
+}

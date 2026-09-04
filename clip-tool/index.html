@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClipTool</title>
+  </head>
+  <body>
+    <!-- Top Custom Titlebar -->
+    <header class="custom-titlebar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+            <path d="M7 4.5v15l13-7.5-13-7.5z" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="brand-name">CLIP<span class="brand-accent">TOOL</span></span>
+      </div>
+
+      <div class="titlebar-drag-mid" data-tauri-drag-region>
+        <div id="top-status-indicator" class="top-status-pill pill-stopped" role="status" aria-live="polite">
+          <span class="status-dot"></span>
+          <span id="top-status-text">Puffer inaktiv</span>
+        </div>
+      </div>
+
+      <div class="titlebar-controls">
+        <button class="titlebar-button" id="titlebar-minimize" title="Minimieren" aria-label="Minimieren">
+          <svg width="11" height="11" viewBox="0 0 12 12"><rect y="5.5" width="12" height="1.4" rx="0.7" fill="currentColor"/></svg>
+        </button>
+        <button class="titlebar-button" id="titlebar-maximize" title="Maximieren / Wiederherstellen" aria-label="Maximieren">
+          <svg width="11" height="11" viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+        </button>
+        <button class="titlebar-button titlebar-close" id="titlebar-close" title="Schließen (in den Tray)" aria-label="Schließen">
+          <svg width="11" height="11" viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main App Shell -->
+    <div id="shell">
+      <!-- Toggleable Sidebar -->
+      <nav id="sidebar" class="sidebar" aria-label="Hauptnavigation">
+        <div class="sidebar-top">
+          <button class="nav-item active" data-view="home" title="Dashboard">
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1z"/>
+              </svg>
+            </div>
+            <span class="nav-label">Dashboard</span>
+          </button>
+
+          <button class="nav-item" data-view="library" title="Bibliothek">
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2.5"/>
+                <path d="M10 9v6l5-3-5-3z" fill="currentColor" stroke="none"/>
+              </svg>
+            </div>
+            <span class="nav-label">Bibliothek</span>
+            <span id="nav-clips-badge" class="nav-badge" style="display:none">0</span>
+          </button>
+
+          <button class="nav-item" data-view="performance" title="Performance">
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <span class="nav-label">Performance</span>
+          </button>
+
+          <button class="nav-item" data-view="settings" title="Einstellungen">
+            <div class="nav-icon">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </div>
+            <span class="nav-label">Einstellungen</span>
+          </button>
+        </div>
+
+        <div class="sidebar-bottom">
+          <!-- Mini Buffer Health widget in sidebar -->
+          <div class="sidebar-buffer-card" id="sidebar-buf-card">
+            <div class="s-buf-header">
+              <span class="s-buf-dot"></span>
+              <span class="s-buf-title" id="s-buf-status">Puffer inaktiv</span>
+            </div>
+          </div>
+
+          <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Sidebar ein-/ausklappen" aria-label="Sidebar ein-/ausklappen">
+            <svg class="toggle-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+            <span class="nav-label collapse-label">Einklappen</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main Dynamic Content Area -->
+      <main id="app"></main>
+    </div>
+
+    <!-- Quick Preview Lightbox Host -->
+    <div id="preview-modal-host"></div>
+
+    <!-- Toast Host -->
+    <div id="toast-host"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

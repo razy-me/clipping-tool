@@ -1,0 +1,53 @@
+﻿# Rust / Cargo
+**/target/
+clip-tool/src-tauri/gen/schemas/
+
+# Node / Web Frontend
+**/node_modules/
+**/dist/
+**/dist-ssr/
+clip-tool/release/
+*.local
+
+# Tauri Sidecars & Binaries
+**/src-tauri/bin/
+*.exe
+
+# Logs & Error Reports
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+**/last_error_report.txt
+
+# Snapshots & Performance Profiling dumps
+perf_snapshot.txt
+perf_snapshots/
+
+# Media & Temporary Recordings / Test Clips
+*.mp4
+*.mkv
+*.ts
+*.aac
+*.wav
+
+# Vendored toolchain & archives
+*.zip
+*.tar.*
+ffmpeg_unzipped/
+ffmpeg_gyan_unzipped/
+rustup-init.exe
+
+# IDEs & System files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

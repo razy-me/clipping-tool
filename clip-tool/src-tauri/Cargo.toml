@@ -1,0 +1,46 @@
+[package]
+name = "clip-tool"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = ["tray-icon", "protocol-asset"] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-shell = "2.3.5"
+tauri-plugin-autostart = "2"
+axum = "0.8"
+rodio = "0.21.1"
+windows = { version = "0.61.3", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_ProcessStatus", "Win32_Media_Audio", "Win32_System_Threading", "Win32_Graphics_Gdi", "Win32_System_JobObjects", "Win32_Security", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_Shell", "Win32_System_Power", "Win32_System_SystemInformation", "Win32_Media", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
+chrono = "0.4.45"
+cpal = "0.16"
+sysinfo = "0.36.1"
+tokio = { version = "1.53.1", features = ["full", "sync"] }
+wasapi = "0.23.0"
+trash = "5"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+strip = true
+panic = "abort"
+
