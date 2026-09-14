@@ -222,11 +222,12 @@ fn collect_window_pids() -> Vec<u32> {
 pub(crate) fn with_process_snapshot<T>(f: impl FnOnce(&System) -> T) -> T {
     static SHARED: std::sync::Mutex<Option<(System, std::time::Instant)>> = std::sync::Mutex::new(None);
     let mut guard = SHARED.lock().unwrap();
-    let needs_refresh = match guard.as_ref() {
-        Some((_, at)) => at.elapsed() > std::time::Duration::from_millis(3500),
-        None => true,
-    };
-    if needs_refresh {
+    if let Some((ref mut sys, ref mut at)) = *guard {
+        if at.elapsed() > std::time::Duration::from_millis(5000) {
+            sys.refresh_processes(ProcessesToUpdate::All, true);
+            *at = std::time::Instant::now();
+        }
+    } else {
         let mut sys = System::new_with_specifics(
             RefreshKind::nothing()
                 .with_processes(ProcessRefreshKind::nothing().with_exe(sysinfo::UpdateKind::OnlyIfNotSet)),

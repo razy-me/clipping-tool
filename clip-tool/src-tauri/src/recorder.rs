@@ -377,12 +377,18 @@ impl InMemoryVideoBuffer {
 
 static VIDEO_BUFFER: Mutex<Option<InMemoryVideoBuffer>> = Mutex::new(None);
 
-pub fn init_video_buffer(buffer_length_secs: u32, bitrate_str: &str, _tier: crate::hardware_profile::HardwareTier) {
+pub fn init_video_buffer(buffer_length_secs: u32, bitrate_str: &str, tier: crate::hardware_profile::HardwareTier) {
     let num_k = bitrate_str.strip_suffix('k').or_else(|| bitrate_str.strip_suffix('K')).unwrap_or(bitrate_str);
     let kbps: usize = num_k.parse().unwrap_or(20000);
     let requested_bytes = ((kbps * 1000 / 8) * (buffer_length_secs as usize + 30)).max(64 * 1024 * 1024);
     
-    let max_bytes = requested_bytes;
+    // F-07: Dynamically cap buffer memory based on hardware tier to prevent RAM exhaustion
+    let tier_cap = match tier {
+        crate::hardware_profile::HardwareTier::LowTier => 384 * 1024 * 1024, // 384 MB cap on budget/iGPU systems
+        crate::hardware_profile::HardwareTier::MidTier => 768 * 1024 * 1024, // 768 MB cap on mid-range systems
+        crate::hardware_profile::HardwareTier::HighTier | crate::hardware_profile::HardwareTier::UltraTier => 1536 * 1024 * 1024, // 1.5 GB on high/ultra systems
+    };
+    let max_bytes = requested_bytes.min(tier_cap);
 
     let mut guard = VIDEO_BUFFER.lock().unwrap();
     *guard = Some(InMemoryVideoBuffer::new(max_bytes));

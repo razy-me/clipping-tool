@@ -380,8 +380,11 @@ pub fn delete_clip(app: AppHandle, path: String) -> Result<(), String> {
         let clean_str = v.to_string_lossy();
         let clean_v = PathBuf::from(clean_str.trim_start_matches(r"\\?\"));
         if let Err(e) = trash::delete(&clean_v) {
-            if first_err.is_none() {
-                first_err = Some(e.to_string());
+            // F-16: Fallback to direct file deletion if Recycle Bin is unsupported (external USB / network drives)
+            if let Err(fe) = std::fs::remove_file(&clean_v) {
+                if first_err.is_none() {
+                    first_err = Some(format!("Trash error: {e}, direct deletion error: {fe}"));
+                }
             }
         }
     }
