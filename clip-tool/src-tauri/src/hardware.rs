@@ -70,16 +70,9 @@ pub async fn detect_best_encoder_for_codec(app: &AppHandle, codec: &VideoCodec) 
         VideoCodec::AV1 => (&["av1_nvenc", "av1_amf", "av1_qsv"][..], "libsvtav1"),
     };
 
-    // Parallel probe all candidate encoders concurrently instead of waiting sequentially up to 24s
-    let (c1, c2, c3) = (candidates[0], candidates[1], candidates[2]);
-    let (r1, r2, r3) = tokio::join!(
-        probe_encoder(app, c1),
-        probe_encoder(app, c2),
-        probe_encoder(app, c3),
-    );
-
-    for (enc, ok) in [(c1, r1), (c2, r2), (c3, r3)] {
-        if ok {
+    // Sequential probing with early exit: avoids concurrent GPU driver context conflicts / TDR resets (F-15)
+    for enc in candidates {
+        if probe_encoder(app, enc).await {
             println!("[encoder] {} available for {:?}", enc, codec);
             let mut guard = CACHE.lock().unwrap();
             let cache = guard.get_or_insert_with(HardwareDiskCache::default);
@@ -90,17 +83,9 @@ pub async fn detect_best_encoder_for_codec(app: &AppHandle, codec: &VideoCodec) 
     }
 
     if *codec == VideoCodec::AV1 {
-        let (h1, h2, h3, h4, h5, h6) = ("hevc_nvenc", "h264_nvenc", "hevc_amf", "h264_amf", "hevc_qsv", "h264_qsv");
-        let (hr1, hr2, hr3, hr4, hr5, hr6) = tokio::join!(
-            probe_encoder(app, h1),
-            probe_encoder(app, h2),
-            probe_encoder(app, h3),
-            probe_encoder(app, h4),
-            probe_encoder(app, h5),
-            probe_encoder(app, h6),
-        );
-        for (enc, ok) in [(h1, hr1), (h2, hr2), (h3, hr3), (h4, hr4), (h5, hr5), (h6, hr6)] {
-            if ok {
+        let fallbacks = ["hevc_nvenc", "h264_nvenc", "hevc_amf", "h264_amf", "hevc_qsv", "h264_qsv"];
+        for enc in fallbacks {
+            if probe_encoder(app, enc).await {
                 println!("[encoder] AV1 hardware encoder not supported on this GPU, using {} instead", enc);
                 let mut guard = CACHE.lock().unwrap();
                 let cache = guard.get_or_insert_with(HardwareDiskCache::default);

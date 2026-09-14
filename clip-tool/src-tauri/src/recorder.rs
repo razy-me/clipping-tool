@@ -880,6 +880,17 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
                 .cloned()
                 .unwrap_or_else(|| format!("FFmpeg beendet (Exit Code: {:?})", term_code));
 
+            // F-03: Detect Desktop Duplication (DXGI) access denial on multi-GPU laptops
+            let is_ddagrab_access_denied = err_tail.iter().any(|l| {
+                let lower = l.to_lowercase();
+                lower.contains("access denied") || lower.contains("dxgi_error") || lower.contains("failed to duplicate")
+            });
+            let user_friendly_err = if is_ddagrab_access_denied {
+                "Bildschirmaufnahme (DXGI) blockiert: Auf Laptops mit Hybrid-Grafik bitte Windows-Grafikeinstellungen prüfen (gleiche GPU wie Bildschirm nutzen).".to_string()
+            } else {
+                last_meaningful_err
+            };
+
             let attempts = AUTO_RESTARTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if attempts < 3 {
                 println!("[buffer] auto-restarting pipeline (attempt {} of 3)", attempts + 1);
@@ -887,7 +898,7 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
                 let a2 = app_c.clone();
                 tauri::async_runtime::spawn(restart_after_delay(a2));
             } else {
-                emit_buffer_state(&app_c, BufferState::Error, Some(&last_meaningful_err));
+                emit_buffer_state(&app_c, BufferState::Error, Some(&user_friendly_err));
             }
         }
     });
