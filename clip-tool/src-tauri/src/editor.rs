@@ -531,7 +531,7 @@ async fn api_export(State(ctx): State<Ctx>, Query(p): Query<HashMap<String, Stri
         }
     }
 
-    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg") else {
+    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg").or_else(|_| ctx.app.shell().command("ffmpeg")) else {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"ffmpeg missing"}))).into_response();
     };
     let Ok((mut rx, child)) = cmd.args(&args).spawn() else {
@@ -668,7 +668,7 @@ async fn api_screenshot_to_clipboard(State(ctx): State<Ctx>, Query(p): Query<Has
     let time_sec: f64 = p.get("time").and_then(|t| t.parse().ok()).unwrap_or(0.0);
     let input_path = ctx.clip.full_path.clone();
 
-    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg") else {
+    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg").or_else(|_| ctx.app.shell().command("ffmpeg")) else {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok":false,"error":"ffmpeg missing"}))).into_response();
     };
 

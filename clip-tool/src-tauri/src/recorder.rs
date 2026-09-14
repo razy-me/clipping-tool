@@ -979,9 +979,6 @@ pub async fn save_clip(
     }
     let _save_guard = SaveGuard;
 
-    // Instant audible confirmation sound only when save is actually accepted
-    crate::audio::play_notification_sound();
-
     let clean_game_name: String = game_name
         .chars()
         .map(|c| match c {
@@ -1039,6 +1036,10 @@ pub async fn save_clip(
             spike_markers: Vec::new(),
         }
     });
+    // F-10: Play audible confirmation sound only AFTER audio window has been extracted
+    // so the beep sound never leaks into the recorded clip.
+    crate::audio::play_notification_sound();
+
     let audio_tracks = dumped_audio.tracks;
     let spike_markers = dumped_audio.spike_markers;
 

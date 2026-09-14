@@ -183,7 +183,7 @@ async fn probe_encoder(app: &AppHandle, encoder: &str) -> bool {
         "-".into(),
     ];
 
-    let cmd = match app.shell().sidecar("ffmpeg") {
+    let cmd = match app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")) {
         Ok(c) => c.args(args),
         Err(_) => return false,
     };

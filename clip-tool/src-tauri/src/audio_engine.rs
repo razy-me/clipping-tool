@@ -141,7 +141,7 @@ impl AudioTrack {
             }
         } else {
             let spf = (self.sample_rate as usize * self.channels as usize).max(1);
-            let max_chunk_samples = spf / 10; // ~100ms coalesce limit
+            let max_chunk_samples = spf; // ~1000ms (1.0s) coalesce limit: slashes heap chunk allocations by 90%
 
             let mut appended = false;
             if let Some(last) = self.chunks.back_mut() {
@@ -498,11 +498,22 @@ pub fn start_audio_capture(
                             ),
                             cpal::SampleFormat::I16 => device.build_input_stream(
                                 &stream_cfg,
-                                move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                                    let f32_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
-                                    if let Ok(mut trks) = tc.lock() {
-                                        if let Some(t) = trks.get_mut("System") {
-                                            t.push_samples(&f32_data);
+                                {
+                                    let mut overflow = Vec::new();
+                                    let mut f32_buf = Vec::new();
+                                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                                        f32_buf.clear();
+                                        f32_buf.extend(data.iter().map(|&s| s as f32 / 32768.0));
+                                        if let Ok(mut trks) = tc.try_lock() {
+                                            if let Some(t) = trks.get_mut("System") {
+                                                if !overflow.is_empty() {
+                                                    t.push_samples(&overflow);
+                                                    overflow.clear();
+                                                }
+                                                t.push_samples(&f32_buf);
+                                            }
+                                        } else {
+                                            overflow.extend_from_slice(&f32_buf);
                                         }
                                     }
                                 },
@@ -511,11 +522,22 @@ pub fn start_audio_capture(
                             ),
                             cpal::SampleFormat::U16 => device.build_input_stream(
                                 &stream_cfg,
-                                move |data: &[u16], _: &cpal::InputCallbackInfo| {
-                                    let f32_data: Vec<f32> = data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0).collect();
-                                    if let Ok(mut trks) = tc.lock() {
-                                        if let Some(t) = trks.get_mut("System") {
-                                            t.push_samples(&f32_data);
+                                {
+                                    let mut overflow = Vec::new();
+                                    let mut f32_buf = Vec::new();
+                                    move |data: &[u16], _: &cpal::InputCallbackInfo| {
+                                        f32_buf.clear();
+                                        f32_buf.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
+                                        if let Ok(mut trks) = tc.try_lock() {
+                                            if let Some(t) = trks.get_mut("System") {
+                                                if !overflow.is_empty() {
+                                                    t.push_samples(&overflow);
+                                                    overflow.clear();
+                                                }
+                                                t.push_samples(&f32_buf);
+                                            }
+                                        } else {
+                                            overflow.extend_from_slice(&f32_buf);
                                         }
                                     }
                                 },
@@ -599,7 +621,7 @@ pub fn start_audio_capture(
                                         if spike_enabled && !data.is_empty() {
                                             let sum_sq: f32 = data.iter().map(|s| s * s).sum();
                                             let rms = (sum_sq / data.len() as f32).sqrt();
-                                            if let Ok(mut sd) = sdc.lock() {
+                                            if let Ok(mut sd) = sdc.try_lock() {
                                                 sd.feed(rms, std::time::Instant::now(), std::time::Duration::from_secs((buf_len + 15) as u64));
                                             }
                                         }
@@ -610,18 +632,29 @@ pub fn start_audio_capture(
                             ),
                             cpal::SampleFormat::I16 => device.build_input_stream(
                                 &stream_cfg,
-                                move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                                    let f32_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
-                                    if let Ok(mut trks) = tc.lock() {
-                                        if let Some(t) = trks.get_mut("Microphone") {
-                                            t.push_mic(&f32_data);
+                                {
+                                    let mut overflow = Vec::new();
+                                    let mut f32_buf = Vec::new();
+                                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                                        f32_buf.clear();
+                                        f32_buf.extend(data.iter().map(|&s| s as f32 / 32768.0));
+                                        if let Ok(mut trks) = tc.try_lock() {
+                                            if let Some(t) = trks.get_mut("Microphone") {
+                                                if !overflow.is_empty() {
+                                                    t.push_mic(&overflow);
+                                                    overflow.clear();
+                                                }
+                                                t.push_mic(&f32_buf);
+                                            }
+                                        } else {
+                                            overflow.extend_from_slice(&f32_buf);
                                         }
-                                    }
-                                    if spike_enabled && !f32_data.is_empty() {
-                                        let sum_sq: f32 = f32_data.iter().map(|s| s * s).sum();
-                                        let rms = (sum_sq / f32_data.len() as f32).sqrt();
-                                        if let Ok(mut sd) = sdc.lock() {
-                                            sd.feed(rms, std::time::Instant::now(), std::time::Duration::from_secs((buf_len + 15) as u64));
+                                        if spike_enabled && !f32_buf.is_empty() {
+                                            let sum_sq: f32 = f32_buf.iter().map(|s| s * s).sum();
+                                            let rms = (sum_sq / f32_buf.len() as f32).sqrt();
+                                            if let Ok(mut sd) = sdc.try_lock() {
+                                                sd.feed(rms, std::time::Instant::now(), std::time::Duration::from_secs((buf_len + 15) as u64));
+                                            }
                                         }
                                     }
                                 },
@@ -630,18 +663,29 @@ pub fn start_audio_capture(
                             ),
                             cpal::SampleFormat::U16 => device.build_input_stream(
                                 &stream_cfg,
-                                move |data: &[u16], _: &cpal::InputCallbackInfo| {
-                                    let f32_data: Vec<f32> = data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0).collect();
-                                    if let Ok(mut trks) = tc.lock() {
-                                        if let Some(t) = trks.get_mut("Microphone") {
-                                            t.push_mic(&f32_data);
+                                {
+                                    let mut overflow = Vec::new();
+                                    let mut f32_buf = Vec::new();
+                                    move |data: &[u16], _: &cpal::InputCallbackInfo| {
+                                        f32_buf.clear();
+                                        f32_buf.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
+                                        if let Ok(mut trks) = tc.try_lock() {
+                                            if let Some(t) = trks.get_mut("Microphone") {
+                                                if !overflow.is_empty() {
+                                                    t.push_mic(&overflow);
+                                                    overflow.clear();
+                                                }
+                                                t.push_mic(&f32_buf);
+                                            }
+                                        } else {
+                                            overflow.extend_from_slice(&f32_buf);
                                         }
-                                    }
-                                    if spike_enabled && !f32_data.is_empty() {
-                                        let sum_sq: f32 = f32_data.iter().map(|s| s * s).sum();
-                                        let rms = (sum_sq / f32_data.len() as f32).sqrt();
-                                        if let Ok(mut sd) = sdc.lock() {
-                                            sd.feed(rms, std::time::Instant::now(), std::time::Duration::from_secs((buf_len + 15) as u64));
+                                        if spike_enabled && !f32_buf.is_empty() {
+                                            let sum_sq: f32 = f32_buf.iter().map(|s| s * s).sum();
+                                            let rms = (sum_sq / f32_buf.len() as f32).sqrt();
+                                            if let Ok(mut sd) = sdc.try_lock() {
+                                                sd.feed(rms, std::time::Instant::now(), std::time::Duration::from_secs((buf_len + 15) as u64));
+                                            }
                                         }
                                     }
                                 },
@@ -760,6 +804,7 @@ pub fn start_audio_capture(
                                                     if audio_client.start_stream().is_ok() {
                                                         let mut sample_buf: VecDeque<u8> = VecDeque::new();
                                                         let mut overflow_f32: Vec<f32> = Vec::new();
+                                                        let mut f32_scratch: Vec<f32> = Vec::with_capacity(4096);
 
                                                         loop {
                                                             if stop.load(Ordering::Relaxed) || kill.load(Ordering::Relaxed) { break; }
@@ -778,10 +823,11 @@ pub fn start_audio_capture(
                                                                 }
                                                                 if !sample_buf.is_empty() {
                                                                     let slice = sample_buf.make_contiguous();
-                                                                    let f32s: Vec<f32> = slice
+                                                                    f32_scratch.clear();
+                                                                    f32_scratch.extend(slice
                                                                         .chunks_exact(4)
                                                                         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-                                                                        .collect();
+                                                                    );
                                                                     sample_buf.clear();
                                                                     
                                                                     if let Ok(mut trks) = tracks_c.try_lock() {
@@ -790,10 +836,10 @@ pub fn start_audio_capture(
                                                                                 t.push_samples(&overflow_f32);
                                                                                 overflow_f32.clear();
                                                                             }
-                                                                            t.push_samples(&f32s);
+                                                                            t.push_samples(&f32_scratch);
                                                                         }
                                                                     } else {
-                                                                        overflow_f32.extend_from_slice(&f32s);
+                                                                        overflow_f32.extend_from_slice(&f32_scratch);
                                                                     }
                                                                 }
                                                             }
@@ -1027,8 +1073,22 @@ pub fn dump_audio_clips(
 
     if !active_app_tracks.is_empty() {
         // Dedicated per-app tracks with audio (e.g. Chrome, Game, Discord).
-        // Discard System so sounds are NOT doubled!
-        tracks_to_save.extend(active_app_tracks);
+        tracks_to_save.extend(active_app_tracks.clone());
+
+        // F-05: Preserve background sounds (e.g. Spotify, Discord voice minimized in tray).
+        // Check if System contains audio beyond the isolated apps by subtracting isolated apps.
+        if let Some((s_name, s_sr, s_ch, s_samples)) = system_track {
+            let mut residual = s_samples.clone();
+            for (_, _, _, app_samples) in &active_app_tracks {
+                for (r, a) in residual.iter_mut().zip(app_samples.iter()) {
+                    *r -= a;
+                }
+            }
+            let residual_peak = residual.iter().fold(0.0f32, |acc, &x| acc.max(x.abs()));
+            if residual_peak >= 0.005 {
+                tracks_to_save.push((format!("{s_name} (Background)"), s_sr, s_ch, residual));
+            }
+        }
     } else if let Some(sys) = system_track {
         // Fallback: no isolated app tracks had audio, so use System.
         tracks_to_save.push(sys);
