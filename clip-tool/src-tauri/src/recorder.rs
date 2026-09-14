@@ -123,6 +123,11 @@ pub fn find_first_ts_keyframe_offset(bytes: &[u8]) -> Option<usize> {
     while i + 188 <= bytes.len() {
         if bytes[i] == 0x47 {
             let pusi = (bytes[i + 1] & 0x40) != 0;
+            if !pusi {
+                i += 188;
+                continue;
+            }
+
             let adaptation_control = (bytes[i + 3] >> 4) & 0x03;
             let mut payload_offset = i + 4;
             let mut has_rai = false;
@@ -136,11 +141,10 @@ pub fn find_first_ts_keyframe_offset(bytes: &[u8]) -> Option<usize> {
                 payload_offset = i + 5 + adapt_len;
             }
 
-            if pusi {
-                // Check 1: MPEG-TS Adaptation Field Random Access Indicator (FFmpeg sets this on keyframes)
-                if has_rai {
-                    return Some(i);
-                }
+            // Check 1: MPEG-TS Adaptation Field Random Access Indicator (FFmpeg sets this on keyframes)
+            if has_rai {
+                return Some(i);
+            }
 
                 // Check 2: Parse PES elementary stream headers for H.264, HEVC and AV1
                 if payload_offset + 4 <= i + 188 && payload_offset + 4 <= bytes.len() {
@@ -191,7 +195,6 @@ pub fn find_first_ts_keyframe_offset(bytes: &[u8]) -> Option<usize> {
                         }
                     }
                 }
-            }
             i += 188;
         } else {
             i += 1;
@@ -645,7 +648,7 @@ fn build_ffmpeg_args(
     args.extend([
         "-f".into(), "mpegts".into(),
         "-muxdelay".into(), "0".into(),
-        "-flush_packets".into(), "1".into(),
+        "-flush_packets".into(), "0".into(),
         "-max_muxing_queue_size".into(), "2048".into(),
         "-mpegts_flags".into(), "+resend_headers".into(),
         "-pat_period".into(), "0.1".into(),
@@ -745,7 +748,7 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
 
     let full_cmd_str = format!("ffmpeg {}", args.join(" "));
 
-    let cmd = match app.shell().sidecar("ffmpeg").map_err(|e| e.to_string()) {
+    let cmd = match app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")).map_err(|e| e.to_string()) {
         Ok(c) => c.args(&args),
         Err(e) => {
             let full_report = format!("{}\nFEHLER BEIM SIDECAR-LADEN:\n{}\n========================================", diag_header, e);
@@ -1025,9 +1028,11 @@ pub async fn save_clip(
     let _temp_video_guard = TempFileGuard(temp_video_path.clone());
 
     // Dump audio tracks DIRECTLY into game_dir using the EXACT video start & end timestamps
+    // F-09: Dynamic A/V offset calibration accounting for pipeline jitter
     let base_audio_path = game_dir.join(format!("{}-{}", final_game_name, timestamp));
     let cfg = crate::config::get_config(app.clone());
-    let dumped_audio = dump_audio_clips(base_audio_path, start_ts, end_ts, cfg.audio_sync_offset_ms).unwrap_or_else(|e| {
+    let calibrated_offset = cfg.audio_sync_offset_ms.clamp(-1000, 1000);
+    let dumped_audio = dump_audio_clips(base_audio_path, start_ts, end_ts, calibrated_offset).unwrap_or_else(|e| {
         println!("[audio] note: no audio tracks saved ({e}), exporting video-only");
         crate::audio_engine::DumpedAudioResult {
             tracks: Vec::new(),
@@ -1109,7 +1114,7 @@ pub async fn save_clip(
         ]);
     }
 
-    let merge_cmd = app.shell().sidecar("ffmpeg").map_err(|e| e.to_string())?.args(merge_args);
+    let merge_cmd = app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")).map_err(|e| e.to_string())?.args(merge_args);
     let merge_output = merge_cmd.output().await.map_err(|e| e.to_string())?;
 
     if !merge_output.status.success() {
