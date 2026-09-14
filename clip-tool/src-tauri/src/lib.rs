@@ -151,23 +151,30 @@ pub fn run() {
               .icon(icon)
               .on_menu_event(|app, event| match event.id.as_ref() {
                   "quit" => {
-                      // Don't corrupt an in-flight save: wait briefly.
-                      for _ in 0..40 {
-                          if !recorder::is_saving() { break; }
-                          std::thread::sleep(std::time::Duration::from_millis(250));
-                      }
-                      let state = app.state::<recorder::RecorderState>();
-                      if let Some(child_arc) = state.child.lock().unwrap().take() {
-                          if let Ok(mut opt) = child_arc.lock() {
-                              if let Some(child) = opt.take() {
-                                  let _ = child.kill();
+                      let app_h = app.clone();
+                      tauri::async_runtime::spawn(async move {
+                          // Immediately hide main window for instant responsive UX (F-14)
+                          if let Some(window) = app_h.get_webview_window("main") {
+                              let _ = window.hide();
+                          }
+                          // Don't corrupt an in-flight save: wait briefly asynchronously without freezing main thread
+                          for _ in 0..40 {
+                              if !recorder::is_saving() { break; }
+                              tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                          }
+                          let state = app_h.state::<recorder::RecorderState>();
+                          if let Some(child_arc) = state.child.lock().unwrap().take() {
+                              if let Ok(mut opt) = child_arc.lock() {
+                                  if let Some(child) = opt.take() {
+                                      let _ = child.kill();
+                                  }
                               }
                           }
-                      }
-                      unsafe {
-                          let _ = windows::Win32::Media::timeEndPeriod(1);
-                      }
-                      std::process::exit(0);
+                          unsafe {
+                              let _ = windows::Win32::Media::timeEndPeriod(1);
+                          }
+                          std::process::exit(0);
+                      });
                   }
                   "show" => {
                       if let Some(window) = app.get_webview_window("main") {

@@ -9,8 +9,8 @@
   <img src="https://img.shields.io/badge/Node.js-%3E%3D18-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >=18">
   <img src="https://img.shields.io/badge/Rust-1.70%2B-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust 1.70+">
   <img src="https://img.shields.io/badge/Tests-425%20Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white" alt="Tests 425 Passing">
-  <img src="https://img.shields.io/badge/Status-Beta%20%7C%20WIP-orange?style=flat-square" alt="Status Beta | WIP">
-  <img src="https://img.shields.io/badge/Export-MP4%20%7C%20WebM-0078D6?style=flat-square" alt="Export Formats">
+  <img src="https://img.shields.io/badge/Status-Beta%20%7C%20Active-brightgreen?style=flat-square" alt="Status Beta | Active">
+  <img src="https://img.shields.io/badge/Export-MP4%20(Multi--Track)-0078D6?style=flat-square" alt="Export Formats">
 </p>
 
 <p align="center">
@@ -22,17 +22,12 @@
 
 </div>
 
-> [!WARNING]
-> **Work in Progress**: This tool is currently in active development and basically 40% Bugs and 60% unfinished.
-
----
-
 ## Features
 
-- **⚡ Lightweight**: Minimal CPU/GPU idle usage via native Rust & Tauri 2.
-- **🎮 Smooth Capture**: Hardware-accelerated desktop & game capture using Windows Graphics Capture (`WGC`).
-- **🔊 Multi-Source Audio**: Low-latency WASAPI/CPAL engine for system sound, mic, and apps.
-- **✂️ In-App Trimming & Overlay**: Quick clipping, built-in trimmer, and an in-game overlay.
+- **⚡ Lightweight**: Minimal CPU/GPU idle usage via native Rust & Tauri 2 in-memory RAM buffer.
+- **🎮 Smooth Capture**: Hardware-accelerated desktop & game capture using DirectX Desktop Duplication (DXGI / `ddagrab`).
+- **🔊 Multi-Source Audio**: Low-latency WASAPI/CPAL engine for system sound, mic, and per-app audio separation.
+- **✂️ In-App Trimming & Overlay**: Quick clipping, built-in multi-track editor, and an in-game overlay.
 - **⌨️ Hotkeys & Gamepad**: Trigger clips instantly with customizable shortcuts or controller buttons.
 
 ---
