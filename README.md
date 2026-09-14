@@ -23,7 +23,7 @@
 </div>
 
 > [!WARNING]
-> **Work in Progress**: This tool is currently in active development and is not yet 100% bug-free.
+> **Work in Progress**: This tool is currently in active development and basically 40% Bugs and 60% unfinished.
 
 ---
 
