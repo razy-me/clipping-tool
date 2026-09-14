@@ -1,4 +1,4 @@
-﻿# Rust / Cargo
+# Rust / Cargo
 **/target/
 clip-tool/src-tauri/gen/schemas/
 
@@ -29,7 +29,6 @@ perf_snapshots/
 # Media & Temporary Recordings / Test Clips
 *.mp4
 *.mkv
-*.ts
 *.aac
 *.wav
 

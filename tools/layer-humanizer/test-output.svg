@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="46" fill="none" viewBox="0 0 48 46">
+  <path id="elem-violett-akzent-1" fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1" data-name="Pfad Violett Akzent" />
+  <mask id="mask-silhouette" data-name="Schnittmaske Silhouette" width="48" height="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+    <path id="elem-schwarz-2" fill="#000" d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" style="fill:#000;fill-opacity:1" data-name="Pfad Schwarz" />
+  </mask>
+  <g id="layer-group-masked" mask="url(#mask-silhouette)" data-name="Maskierte Ebenengruppe">
+    <g id="glow-group-4" filter="url(#filter-blur-weich-1)" data-name="Leucht-Effekt Ebene (4)">
+      <ellipse id="elem-helllila-glanz-5" cx="5.508" cy="14.704" fill="#ede6ff" rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -4.47 31.516)" data-name="Ellipse Hellviolett Glanz" />
+    </g>
+    <g id="glow-group-6" filter="url(#filter-blur-weich-2)" data-name="Leucht-Effekt Ebene (6)">
+      <ellipse id="elem-helllila-glanz-7" cx="10.399" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -39.328 7.883)" data-name="Ellipse Hellviolett Glanz" />
+    </g>
+    <g id="glow-group-8" filter="url(#filter-blur-fein-3)" data-name="Leucht-Effekt Ebene (8)">
+      <ellipse id="elem-lila-leuchten-9" cx="5.508" cy="30.487" fill="#7e14ff" rx="5.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.639)scale(1 -1)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-10" filter="url(#filter-blur-fein-4)" data-name="Leucht-Effekt Ebene (10)">
+      <ellipse id="elem-lila-leuchten-11" cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -32.644 -3.334)scale(1 -1)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-12" filter="url(#filter-blur-fein-5)" data-name="Leucht-Effekt Ebene (12)">
+      <ellipse id="elem-lila-leuchten-13" cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -34.34 30.47)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-14" filter="url(#filter-blur-weich-6)" data-name="Leucht-Effekt Ebene (14)">
+      <ellipse id="elem-helllila-glanz-15" cx="14.072" cy="22.078" fill="#ede6ff" rx="14.072" ry="22.078" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="rotate(93.35 24.506 48.493)scale(-1 1)" data-name="Ellipse Hellviolett Glanz" />
+    </g>
+    <g id="glow-group-16" filter="url(#filter-blur-fein-7)" data-name="Leucht-Effekt Ebene (16)">
+      <ellipse id="elem-lila-leuchten-17" cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-18" filter="url(#filter-blur-fein-8)" data-name="Leucht-Effekt Ebene (18)">
+      <ellipse id="elem-lila-leuchten-19" cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-20" filter="url(#filter-blur-fein-9)" data-name="Leucht-Effekt Ebene (20)">
+      <ellipse id="elem-lila-leuchten-21" cx=".387" cy="8.972" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(39.51 .387 8.972)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-22" filter="url(#filter-blur-fein-10)" data-name="Leucht-Effekt Ebene (22)">
+      <ellipse id="elem-lila-leuchten-23" cx="47.523" cy="-6.092" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 47.523 -6.092)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-24" filter="url(#filter-blur-fein-11)" data-name="Leucht-Effekt Ebene (24)">
+      <ellipse id="elem-cyan-akzent-25" cx="41.412" cy="6.333" fill="#47bfff" rx="5.971" ry="9.665" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 41.412 6.333)" data-name="Ellipse Cyan Akzent" />
+    </g>
+    <g id="glow-group-26" filter="url(#filter-blur-fein-12)" data-name="Leucht-Effekt Ebene (26)">
+      <ellipse id="elem-lila-leuchten-27" cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-28" filter="url(#filter-blur-fein-13)" data-name="Leucht-Effekt Ebene (28)">
+      <ellipse id="elem-lila-leuchten-29" cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-30" filter="url(#filter-blur-fein-14)" data-name="Leucht-Effekt Ebene (30)">
+      <ellipse id="elem-lila-leuchten-31" cx="35.651" cy="29.907" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 35.651 29.907)" data-name="Ellipse Lila Leuchten" />
+    </g>
+    <g id="glow-group-32" filter="url(#filter-blur-fein-15)" data-name="Leucht-Effekt Ebene (32)">
+      <ellipse id="elem-cyan-akzent-33" cx="38.418" cy="32.4" fill="#47bfff" rx="5.971" ry="15.297" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 38.418 32.4)" data-name="Ellipse Cyan Akzent" />
+    </g>
+  </g>
+  <defs>
+    <filter id="filter-blur-weich-1" data-name="Weichzeichner weich 1" width="60.045" height="41.654" x="-19.77" y="16.149" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="7.659"/>
+    </filter>
+    <filter id="filter-blur-weich-2" data-name="Weichzeichner weich 2" width="90.34" height="51.437" x="-54.613" y="-7.533" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="7.659"/>
+    </filter>
+    <filter id="filter-blur-fein-3" data-name="Weichzeichner fein 3" width="79.355" height="29.4" x="-49.64" y="2.03" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-4" data-name="Weichzeichner fein 4" width="79.579" height="29.4" x="-45.045" y="20.029" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-5" data-name="Weichzeichner fein 5" width="79.579" height="29.4" x="-43.513" y="21.178" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-weich-6" data-name="Weichzeichner weich 6" width="74.749" height="58.852" x="15.756" y="-17.901" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="7.659"/>
+    </filter>
+    <filter id="filter-blur-fein-7" data-name="Weichzeichner fein 7" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-8" data-name="Weichzeichner fein 8" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-9" data-name="Weichzeichner fein 9" width="56.045" height="63.649" x="-27.636" y="-22.853" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-10" data-name="Weichzeichner fein 10" width="54.814" height="64.646" x="20.116" y="-38.415" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-11" data-name="Weichzeichner fein 11" width="33.541" height="35.313" x="24.641" y="-11.323" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-12" data-name="Weichzeichner fein 12" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-13" data-name="Weichzeichner fein 13" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-14" data-name="Weichzeichner fein 14" width="54.814" height="64.646" x="8.244" y="-2.416" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+    <filter id="filter-blur-fein-15" data-name="Weichzeichner fein 15" width="39.409" height="43.623" x="18.713" y="10.588" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur result="blur-fx-result" stdDeviation="4.596"/>
+    </filter>
+  </defs>
+</svg>

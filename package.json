@@ -1,10 +1,12 @@
 {
   "name": "cliping-tool-wrapper",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "npm --prefix clip-tool run dev",
     "build": "npm --prefix clip-tool run build",
     "preview": "npm --prefix clip-tool run preview",
-    "tauri": "npm --prefix clip-tool run tauri --"
+    "tauri": "npm --prefix clip-tool run tauri --",
+    "humanize:svg": "node tools/layer-humanizer/humanize-svg.js"
   }
 }
