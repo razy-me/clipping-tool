@@ -1,7 +1,7 @@
 use tauri::AppHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
-use windows::Win32::System::SystemInformation::GetTickCount;
+use windows::Win32::System::SystemInformation::GetTickCount64;
 
 static WAS_AUTO_PAUSED: AtomicBool = AtomicBool::new(false);
 static IDLE_MONITOR_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -23,8 +23,10 @@ pub fn get_idle_time_secs() -> u64 {
             dwTime: 0,
         };
         if GetLastInputInfo(&mut lii).as_bool() {
-            let tick = GetTickCount();
-            return (tick.wrapping_sub(lii.dwTime) / 1000) as u64;
+            // F-18: Use 64-bit tick count to prevent 49.7-day rollover
+            let tick64 = GetTickCount64();
+            let elapsed_ms = (tick64 as u32).wrapping_sub(lii.dwTime) as u64;
+            return elapsed_ms / 1000;
         }
         0
     }

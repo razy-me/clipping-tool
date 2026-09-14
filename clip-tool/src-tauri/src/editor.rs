@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -815,14 +815,36 @@ pub async fn open_editor_window(app: AppHandle, clip: crate::library::ClipItem) 
     let url = format!("http://{}/?t={}", addr, ctx.token);
     println!("[editor] serving at {}", url.split("?t=").next().unwrap_or(""));
 
-    // Open the default browser using the native Windows Shell API (avoids cmd.exe escaping bugs)
-    unsafe {
-        use windows::core::HSTRING;
-        use windows::Win32::UI::Shell::ShellExecuteW;
-        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-        let url_h = HSTRING::from(url.as_str());
-        let op_h = HSTRING::from("open");
-        let _ = ShellExecuteW(None, &op_h, &url_h, None, None, SW_SHOWNORMAL);
+    // F-12: Try to open the editor in a native Tauri WebviewWindow first for seamless desktop UX;
+    // fallback to default browser if window creation fails.
+    let opened_native = if let Ok(parsed_url) = url.parse() {
+        if let Some(existing) = ctx.app.get_webview_window("editor") {
+            let _ = existing.navigate(parsed_url);
+            let _ = existing.show();
+            let _ = existing.set_focus();
+            true
+        } else {
+            tauri::WebviewWindowBuilder::new(&ctx.app, "editor", tauri::WebviewUrl::External(parsed_url))
+                .title("ClipTool Editor")
+                .inner_size(1280.0, 720.0)
+                .min_inner_size(800.0, 600.0)
+                .build()
+                .is_ok()
+        }
+    } else {
+        false
+    };
+
+    if !opened_native {
+        // Fallback to default browser using the native Windows Shell API
+        unsafe {
+            use windows::core::HSTRING;
+            use windows::Win32::UI::Shell::ShellExecuteW;
+            use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+            let url_h = HSTRING::from(url.as_str());
+            let op_h = HSTRING::from("open");
+            let _ = ShellExecuteW(None, &op_h, &url_h, None, None, SW_SHOWNORMAL);
+        }
     }
     Ok(())
 }
