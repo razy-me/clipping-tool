@@ -105,7 +105,8 @@ pub fn get_disk_space_info(app: AppHandle) -> DiskSpaceInfo {
 // Duration probing — ffprobe (precise JSON) with ffmpeg stderr fallback.
 // ──────────────────────────────────────────────────────────────────────────────
 pub async fn get_video_duration(app: &AppHandle, file_path: &str) -> f64 {
-    if let Ok(cmd) = app.shell().sidecar("ffprobe").or_else(|_| app.shell().command("ffprobe")) {
+    let cmd = app.shell().sidecar("ffprobe").unwrap_or_else(|_| app.shell().command("ffprobe"));
+    {
         let cmd = cmd.args(&[
             "-v", "error",
             "-show_entries", "format=duration",
@@ -124,7 +125,8 @@ pub async fn get_video_duration(app: &AppHandle, file_path: &str) -> f64 {
     }
 
     // Fallback: scrape ffmpeg's stderr banner.
-    if let Ok(cmd) = app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")) {
+    let cmd = app.shell().sidecar("ffmpeg").unwrap_or_else(|_| app.shell().command("ffmpeg"));
+    {
         let cmd = cmd.args(&["-i", file_path]);
         if let Ok(out) = cmd.output().await {
             let stderr = String::from_utf8_lossy(&out.stderr);
@@ -155,7 +157,8 @@ pub async fn generate_preview(app: &AppHandle, video_path: &str, duration: f64) 
 
     // Seek slightly after start: frame at exactly 0 can be black on some GPUs.
     let at = if duration > 2.0 { duration / 2.0 } else { 0.1 };
-    if let Ok(cmd) = app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")) {
+    let cmd = app.shell().sidecar("ffmpeg").unwrap_or_else(|_| app.shell().command("ffmpeg"));
+    {
         let cmd = cmd.args(&[
             "-y", "-ss", &format!("{at:.2}"),
             "-i", video_path,

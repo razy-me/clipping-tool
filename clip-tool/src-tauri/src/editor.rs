@@ -531,9 +531,7 @@ async fn api_export(State(ctx): State<Ctx>, Query(p): Query<HashMap<String, Stri
         }
     }
 
-    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg").or_else(|_| ctx.app.shell().command("ffmpeg")) else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"ffmpeg missing"}))).into_response();
-    };
+    let cmd = ctx.app.shell().sidecar("ffmpeg").unwrap_or_else(|_| ctx.app.shell().command("ffmpeg"));
     let Ok((mut rx, child)) = cmd.args(&args).spawn() else {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"spawn failed"}))).into_response();
     };
@@ -668,9 +666,7 @@ async fn api_screenshot_to_clipboard(State(ctx): State<Ctx>, Query(p): Query<Has
     let time_sec: f64 = p.get("time").and_then(|t| t.parse().ok()).unwrap_or(0.0);
     let input_path = ctx.clip.full_path.clone();
 
-    let Ok(cmd) = ctx.app.shell().sidecar("ffmpeg").or_else(|_| ctx.app.shell().command("ffmpeg")) else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"ok":false,"error":"ffmpeg missing"}))).into_response();
-    };
+    let cmd = ctx.app.shell().sidecar("ffmpeg").unwrap_or_else(|_| ctx.app.shell().command("ffmpeg"));
 
     let args = vec![
         "-hide_banner".to_string(), "-loglevel".to_string(), "error".to_string(),

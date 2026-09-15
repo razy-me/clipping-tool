@@ -168,10 +168,7 @@ async fn probe_encoder(app: &AppHandle, encoder: &str) -> bool {
         "-".into(),
     ];
 
-    let cmd = match app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")) {
-        Ok(c) => c.args(args),
-        Err(_) => return false,
-    };
+    let cmd = app.shell().sidecar("ffmpeg").unwrap_or_else(|_| app.shell().command("ffmpeg")).args(args);
 
     match tokio::time::timeout(Duration::from_secs(4), cmd.output()).await {
         Ok(Ok(out)) => out.status.success(),

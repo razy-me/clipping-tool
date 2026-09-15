@@ -53,6 +53,50 @@ pub fn get_active_mic_device() -> String {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// MMCSS (Multimedia Class Scheduler Service) Thread Prioritization
+// ──────────────────────────────────────────────────────────────────────────────
+pub struct MmcssHandle(pub Option<windows::Win32::Foundation::HANDLE>);
+
+impl Drop for MmcssHandle {
+    fn drop(&mut self) {
+        if let Some(h) = self.0.take() {
+            unsafe {
+                use windows::core::s;
+                use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+                use windows::core::w;
+                if let Ok(h_mod) = LoadLibraryW(w!("avrt.dll")) {
+                    type AvRevertMmThreadCharacteristicsFn = unsafe extern "system" fn(windows::Win32::Foundation::HANDLE) -> windows::core::BOOL;
+                    if let Some(proc) = GetProcAddress(h_mod, s!("AvRevertMmThreadCharacteristics")) {
+                        let func: AvRevertMmThreadCharacteristicsFn = std::mem::transmute(proc);
+                        let _ = func(h);
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn join_mmcss(task_name: &str) -> MmcssHandle {
+    unsafe {
+        use windows::core::{s, w, PCWSTR};
+        use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+        if let Ok(h_mod) = LoadLibraryW(w!("avrt.dll")) {
+            type AvSetMmThreadCharacteristicsWFn = unsafe extern "system" fn(PCWSTR, *mut u32) -> windows::Win32::Foundation::HANDLE;
+            if let Some(proc) = GetProcAddress(h_mod, s!("AvSetMmThreadCharacteristicsW")) {
+                let func: AvSetMmThreadCharacteristicsWFn = std::mem::transmute(proc);
+                let wide: Vec<u16> = task_name.encode_utf16().chain(std::iter::once(0)).collect();
+                let mut task_idx = 0u32;
+                let handle = func(PCWSTR(wide.as_ptr()), &mut task_idx);
+                if !handle.is_invalid() {
+                    return MmcssHandle(Some(handle));
+                }
+            }
+        }
+    }
+    MmcssHandle(None)
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // AudioTrack – ring buffer for one audio stream.
 //
 // Timeline model: every received packet is stored WITH its arrival Instant.
@@ -470,6 +514,7 @@ pub fn start_audio_capture(
                 let stream_cfg: cpal::StreamConfig = config.clone().into();
 
                 thread::spawn(move || {
+                    let _mmcss = join_mmcss("Audio");
                     while !stop.load(Ordering::Relaxed) {
                         let failed = Arc::new(AtomicBool::new(false));
                         let failed_c = failed.clone();
@@ -596,6 +641,7 @@ pub fn start_audio_capture(
                 let spike_enabled = spike_detection_enabled;
 
                 thread::spawn(move || {
+                    let _mmcss = join_mmcss("Audio");
                     while !stop.load(Ordering::Relaxed) {
                         let failed = Arc::new(AtomicBool::new(false));
                         let failed_c = failed.clone();
@@ -755,6 +801,7 @@ pub fn start_audio_capture(
                     let reg_worker = reg_sup.clone();
 
                     thread::spawn(move || {
+                        let _mmcss = join_mmcss("Audio");
                         let _ = initialize_mta();
                         unsafe {
                             let _ = windows::Win32::System::Threading::SetThreadPriority(
@@ -824,10 +871,15 @@ pub fn start_audio_capture(
                                                                 if !sample_buf.is_empty() {
                                                                     let slice = sample_buf.make_contiguous();
                                                                     f32_scratch.clear();
-                                                                    f32_scratch.extend(slice
-                                                                        .chunks_exact(4)
-                                                                        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-                                                                    );
+                                                                    let (head, aligned_f32, tail) = unsafe { slice.align_to::<f32>() };
+                                                                    if head.is_empty() && tail.is_empty() {
+                                                                        f32_scratch.extend_from_slice(aligned_f32);
+                                                                    } else {
+                                                                        f32_scratch.extend(slice
+                                                                            .chunks_exact(4)
+                                                                            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                                                                        );
+                                                                    }
                                                                     sample_buf.clear();
                                                                     
                                                                     if let Ok(mut trks) = tracks_c.try_lock() {

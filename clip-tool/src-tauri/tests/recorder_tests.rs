@@ -368,25 +368,25 @@ fn test_capture_graph_nvenc_all_framerates() {
 fn test_capture_graph_cuda_pure_vram_scaling() {
     // Scaling to 720p from 1080p via CUDA/FFmpeg pipeline
     let g720 = capture_graph("h264_nvenc", "60", "720p", 1080, false, &ScalingMethod::Cuda, 0, false);
-    assert!(g720.contains("scale=-2:720"));
+    assert!(g720.contains("scale_cuda=w=-2:h=720:format=nv12"));
     assert!(g720.contains("format=nv12"));
-    assert!(g720.contains("hwdownload"));
+    assert!(!g720.contains("hwdownload"));
 
     // Scaling to 1080p from 1440p
     let g1080 = capture_graph("hevc_nvenc", "60", "1080p", 1440, false, &ScalingMethod::Cuda, 0, false);
-    assert!(g1080.contains("scale=-2:1080"));
+    assert!(g1080.contains("scale_cuda=w=-2:h=1080:format=nv12"));
     assert!(g1080.contains("format=nv12"));
 
     // Scaling to 1440p from 2160p (4K)
     let g1440 = capture_graph("av1_nvenc", "60", "1440p", 2160, false, &ScalingMethod::Cuda, 0, false);
-    assert!(g1440.contains("scale=-2:1440"));
+    assert!(g1440.contains("scale_cuda=w=-2:h=1440:format=nv12"));
     assert!(g1440.contains("format=nv12"));
 
     // Source (no scale) - Direct pass-through with NV12 format conversion
     let g_src = capture_graph("h264_nvenc", "60", "Source", 1080, false, &ScalingMethod::Cuda, 0, false);
-    assert!(!g_src.contains("scale=-2"));
+    assert!(!g_src.contains("scale_cuda=w="));
     assert!(g_src.contains("format=nv12"));
-    assert_eq!(g_src, "ddagrab=output_idx=0:framerate=60:draw_mouse=false:dup_frames=true,hwdownload,format=bgra,format=nv12");
+    assert_eq!(g_src, "ddagrab=output_idx=0:framerate=60:draw_mouse=false:dup_frames=true,hwmap=derive_device=cuda,scale_cuda=format=nv12");
 }
 
 #[test]
@@ -399,26 +399,28 @@ fn test_capture_graph_multi_monitor_output_idx() {
 fn test_capture_graph_qsv_pure_vram_scaling() {
     // QSV downscaled
     let g720 = capture_graph("h264_qsv", "60", "720p", 1080, false, &ScalingMethod::Qsv, 0, false);
-    assert!(g720.contains("scale=-2:720"));
+    assert!(g720.contains("vpp_qsv=w=-1:h=720:format=nv12"));
     assert!(g720.contains("format=nv12"));
+    assert!(!g720.contains("hwdownload"));
 
     // QSV native
     let g_src = capture_graph("h264_qsv", "60", "Source", 1080, false, &ScalingMethod::Qsv, 0, false);
-    assert!(!g_src.contains("scale=-2"));
+    assert!(!g_src.contains("vpp_qsv=w="));
     assert!(g_src.contains("format=nv12"));
+    assert_eq!(g_src, "ddagrab=output_idx=0:framerate=60:draw_mouse=false:dup_frames=true,hwmap=derive_device=qsv,vpp_qsv=format=nv12");
 }
 
 #[test]
 fn test_capture_graph_amf_d3d11_direct() {
     // AMF native
     let g_src = capture_graph("h264_amf", "60", "Source", 1080, false, &ScalingMethod::D3d11Direct, 0, false);
-    assert!(g_src.contains("hwdownload"));
+    assert!(!g_src.contains("hwdownload"));
     assert!(g_src.contains("format=nv12"));
-    assert_eq!(g_src, "ddagrab=output_idx=0:framerate=60:draw_mouse=false:dup_frames=true,hwdownload,format=bgra,format=nv12");
+    assert_eq!(g_src, "ddagrab=output_idx=0:framerate=60:draw_mouse=false:dup_frames=true,scale_d3d11=format=nv12");
 
     // AMF scaled
     let g_scaled = capture_graph("h264_amf", "60", "720p", 1080, false, &ScalingMethod::D3d11Direct, 0, false);
-    assert!(g_scaled.contains("scale=-2:720"));
+    assert!(g_scaled.contains("scale_d3d11=width=-2:height=720:format=nv12"));
     assert!(g_scaled.contains("format=nv12"));
 }
 
@@ -720,7 +722,7 @@ fn test_capture_graph_all_supported_resolutions_cuda() {
     for res in ["1440p", "1080p", "900p", "720p", "540p", "480p", "360p", "240p"] {
         let g = capture_graph("h264_nvenc", "60", res, 2160, false, &ScalingMethod::Cuda, 0, false);
         let h_str = res.trim_end_matches('p');
-        assert!(g.contains(&format!("scale=-2:{h_str}")), "Resolution {} missing scale", res);
+        assert!(g.contains(&format!("scale_cuda=w=-2:h={h_str}")), "Resolution {} missing scale", res);
     }
 }
 
@@ -729,7 +731,7 @@ fn test_capture_graph_all_supported_resolutions_qsv() {
     for res in ["1440p", "1080p", "900p", "720p", "540p", "480p", "360p", "240p"] {
         let g = capture_graph("h264_qsv", "60", res, 2160, false, &ScalingMethod::Qsv, 0, false);
         let h_str = res.trim_end_matches('p');
-        assert!(g.contains(&format!("scale=-2:{h_str}")), "Resolution {} missing scale", res);
+        assert!(g.contains(&format!("vpp_qsv=w=-1:h={h_str}")), "Resolution {} missing scale", res);
     }
 }
 

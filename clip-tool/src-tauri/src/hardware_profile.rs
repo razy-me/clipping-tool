@@ -57,6 +57,37 @@ pub fn apply_ecoqos() {
     }
 }
 
+pub fn apply_process_ecoqos_and_affinity(pid: u32, e_cores_mask: Option<usize>) {
+    unsafe {
+        use windows::Win32::System::Threading::{
+            OpenProcess, SetProcessInformation, SetProcessAffinityMask,
+            ProcessPowerThrottling, PROCESS_POWER_THROTTLING_STATE,
+            PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_SET_INFORMATION,
+        };
+        if let Ok(handle) = OpenProcess(PROCESS_SET_INFORMATION, false, pid) {
+            let mut state = PROCESS_POWER_THROTTLING_STATE {
+                Version: 1,
+                ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+                StateMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+            };
+            let _ = SetProcessInformation(
+                handle,
+                ProcessPowerThrottling,
+                &mut state as *mut _ as *mut c_void,
+                std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+            );
+
+            if let Some(mask) = e_cores_mask {
+                if mask != 0 {
+                    let _ = SetProcessAffinityMask(handle, mask);
+                }
+            }
+
+            let _ = windows::Win32::Foundation::CloseHandle(handle);
+        }
+    }
+}
+
 fn get_e_cores_mask() -> Option<usize> {
     unsafe {
         let mut len = 0;

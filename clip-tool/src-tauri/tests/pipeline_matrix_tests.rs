@@ -46,9 +46,9 @@ fn test_matrix_resolutions_16_by_9_downscaling() {
     for (res_str, target_h) in resolutions {
         // From 4K (2160p) monitor down to target
         let g = capture_graph("h264_nvenc", "60", res_str, 2160, true, &ScalingMethod::Cuda, 0, false);
-        assert!(g.contains(&format!("scale=-2:{target_h}")), "Failed for {}", res_str);
+        assert!(g.contains(&format!("scale_cuda=w=-2:h={target_h}")), "Failed for {}", res_str);
         assert!(g.contains("format=nv12"));
-        assert!(g.contains("hwdownload"));
+        assert!(!g.contains("hwdownload"));
     }
 }
 

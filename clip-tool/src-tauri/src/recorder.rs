@@ -19,6 +19,35 @@ use crate::audio_engine::{start_audio_capture, stop_audio_capture, dump_audio_cl
 use crate::hardware::detect_best_encoder;
 
 // ──────────────────────────────────────────────────────────────────────────────
+// FFmpeg path resolver: finds bundled sidecar or system binary
+// ──────────────────────────────────────────────────────────────────────────────
+pub fn resolve_ffmpeg_path() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let candidates = [
+                parent.join("ffmpeg.exe"),
+                parent.join("ffmpeg-x86_64-pc-windows-msvc.exe"),
+                parent.join("bin").join("ffmpeg-x86_64-pc-windows-msvc.exe"),
+            ];
+            for c in candidates {
+                if c.exists() { return c; }
+            }
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        let candidates = [
+            cwd.join("bin").join("ffmpeg-x86_64-pc-windows-msvc.exe"),
+            cwd.join("ffmpeg.exe"),
+            cwd.join("src-tauri").join("bin").join("ffmpeg-x86_64-pc-windows-msvc.exe"),
+        ];
+        for c in candidates {
+            if c.exists() { return c; }
+        }
+    }
+    PathBuf::from("ffmpeg")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Job object: guarantees bundled ffmpeg dies even if this app crashes.
 // ──────────────────────────────────────────────────────────────────────────────
 static GLOBAL_JOB: Mutex<Option<usize>> = Mutex::new(None);
@@ -271,6 +300,7 @@ pub struct InMemoryVideoBuffer {
     pub chunks: std::collections::VecDeque<TsChunk>,
     pub max_bytes: usize,
     pub current_bytes: usize,
+    pub pool: Vec<Vec<u8>>,
 }
 
 impl InMemoryVideoBuffer {
@@ -279,6 +309,7 @@ impl InMemoryVideoBuffer {
             chunks: std::collections::VecDeque::with_capacity(4096),
             max_bytes,
             current_bytes: 0,
+            pool: Vec::with_capacity(128),
         }
     }
 
@@ -289,6 +320,11 @@ impl InMemoryVideoBuffer {
         while self.current_bytes + len > self.max_bytes {
             if let Some(front) = self.chunks.pop_front() {
                 self.current_bytes = self.current_bytes.saturating_sub(front.data.len());
+                if self.pool.len() < 128 {
+                    let mut recycled = front.data;
+                    recycled.clear();
+                    self.pool.push(recycled);
+                }
             } else {
                 break;
             }
@@ -303,6 +339,15 @@ impl InMemoryVideoBuffer {
             timestamp: now,
             is_keyframe: is_key,
         });
+    }
+
+    pub fn take_recycled_buffer(&mut self, capacity: usize) -> Vec<u8> {
+        if let Some(mut buf) = self.pool.pop() {
+            buf.reserve(capacity.saturating_sub(buf.capacity()));
+            buf
+        } else {
+            Vec::with_capacity(capacity)
+        }
     }
 
     pub fn push_bytes(&mut self, bytes: &[u8]) {
@@ -384,9 +429,9 @@ pub fn init_video_buffer(buffer_length_secs: u32, bitrate_str: &str, tier: crate
     
     // F-07: Dynamically cap buffer memory based on hardware tier to prevent RAM exhaustion
     let tier_cap = match tier {
-        crate::hardware_profile::HardwareTier::LowTier => 384 * 1024 * 1024, // 384 MB cap on budget/iGPU systems
-        crate::hardware_profile::HardwareTier::MidTier => 768 * 1024 * 1024, // 768 MB cap on mid-range systems
-        crate::hardware_profile::HardwareTier::HighTier | crate::hardware_profile::HardwareTier::UltraTier => 1536 * 1024 * 1024, // 1.5 GB on high/ultra systems
+        crate::hardware_profile::HardwareTier::Weak => 384 * 1024 * 1024, // 384 MB cap on budget/iGPU systems
+        crate::hardware_profile::HardwareTier::Mid => 768 * 1024 * 1024, // 768 MB cap on mid-range systems
+        crate::hardware_profile::HardwareTier::Strong => 1536 * 1024 * 1024, // 1.5 GB on high/ultra systems
     };
     let max_bytes = requested_bytes.min(tier_cap);
 
@@ -400,6 +445,16 @@ pub fn push_video_chunk(data: Vec<u8>) {
             buf.push_chunk(data);
         }
     }
+}
+
+pub fn push_and_recycle_video_chunk(data: Vec<u8>) -> Vec<u8> {
+    if let Ok(mut guard) = VIDEO_BUFFER.lock() {
+        if let Some(buf) = guard.as_mut() {
+            buf.push_chunk(data);
+            return buf.take_recycled_buffer(64 * 1024);
+        }
+    }
+    Vec::with_capacity(64 * 1024)
 }
 
 pub fn get_video_buffer_stats() -> (usize, usize, f64, usize) {
@@ -486,7 +541,7 @@ pub fn capture_graph(
     resolution: &str,
     monitor_h: u32,
     draw_mouse: bool,
-    _scaling_method: &crate::hardware::ScalingMethod,
+    scaling_method: &crate::hardware::ScalingMethod,
     monitor_idx: u32,
     hdr_tonemapping: bool,
 ) -> String {
@@ -502,15 +557,42 @@ pub fn capture_graph(
     };
 
     if hdr_tonemapping {
-        if needs_scale {
+        return if needs_scale {
             format!("{ddagrab},hwdownload,format=bgra,tonemap=tonemap=hable:desat=0,scale=-2:{h}:flags=fast_bilinear,format={target_format}")
         } else {
             format!("{ddagrab},hwdownload,format=bgra,tonemap=tonemap=hable:desat=0,format={target_format}")
+        };
+    }
+
+    match scaling_method {
+        crate::hardware::ScalingMethod::Qsv => {
+            if needs_scale {
+                format!("{ddagrab},hwmap=derive_device=qsv,vpp_qsv=w=-1:h={h}:format=nv12")
+            } else {
+                format!("{ddagrab},hwmap=derive_device=qsv,vpp_qsv=format=nv12")
+            }
         }
-    } else if needs_scale {
-        format!("{ddagrab},hwdownload,format=bgra,scale=-2:{h}:flags=fast_bilinear,format={target_format}")
-    } else {
-        format!("{ddagrab},hwdownload,format=bgra,format={target_format}")
+        crate::hardware::ScalingMethod::Cuda => {
+            if needs_scale {
+                format!("{ddagrab},hwmap=derive_device=cuda,scale_cuda=w=-2:h={h}:format=nv12")
+            } else {
+                format!("{ddagrab},hwmap=derive_device=cuda,scale_cuda=format=nv12")
+            }
+        }
+        crate::hardware::ScalingMethod::D3d11Direct => {
+            if needs_scale {
+                format!("{ddagrab},scale_d3d11=width=-2:height={h}:format=nv12")
+            } else {
+                format!("{ddagrab},scale_d3d11=format=nv12")
+            }
+        }
+        crate::hardware::ScalingMethod::CpuFallback => {
+            if needs_scale {
+                format!("{ddagrab},hwdownload,format=bgra,scale=-2:{h}:flags=fast_bilinear,format={target_format}")
+            } else {
+                format!("{ddagrab},hwdownload,format=bgra,format={target_format}")
+            }
+        }
     }
 }
 
@@ -545,13 +627,37 @@ fn build_ffmpeg_args(
 
     let mut args: Vec<String> = vec![
         "-hide_banner".into(), "-loglevel".into(), "warning".into(),
+    ];
+
+    if !hdr_tonemapping {
+        if *scaling_method == crate::hardware::ScalingMethod::Qsv {
+            args.extend([
+                "-init_hw_device".into(), "d3d11va=d3d".into(),
+                "-init_hw_device".into(), "qsv=qsv@d3d".into(),
+                "-filter_hw_device".into(), "d3d".into(),
+            ]);
+        } else if *scaling_method == crate::hardware::ScalingMethod::Cuda {
+            args.extend([
+                "-init_hw_device".into(), "d3d11va=d3d".into(),
+                "-init_hw_device".into(), "cuda=cu@d3d".into(),
+                "-filter_hw_device".into(), "d3d".into(),
+            ]);
+        } else if *scaling_method == crate::hardware::ScalingMethod::D3d11Direct {
+            args.extend([
+                "-init_hw_device".into(), "d3d11va=d3d".into(),
+                "-filter_hw_device".into(), "d3d".into(),
+            ]);
+        }
+    }
+
+    args.extend([
         "-sws_flags".into(), "fast_bilinear".into(),
         "-filter_threads".into(), "1".into(),
         "-filter_complex".into(), graph,
         "-c:v".into(), encoder.into(),
         "-g".into(), gop_size.to_string(),
         "-fps_mode".into(), "passthrough".into(),
-    ];
+    ]);
 
     match encoder {
         "libx264" | "libx265" => {
@@ -753,16 +859,7 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
     };
 
     let full_cmd_str = format!("ffmpeg {}", args.join(" "));
-
-    let cmd = match app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")).map_err(|e| e.to_string()) {
-        Ok(c) => c.args(&args),
-        Err(e) => {
-            let full_report = format!("{}\nFEHLER BEIM SIDECAR-LADEN:\n{}\n========================================", diag_header, e);
-            update_diagnostic_log(full_report);
-            emit_buffer_state(&app, BufferState::Error, Some(&e));
-            return Err(e);
-        }
-    };
+    let cmd = app.shell().sidecar("ffmpeg").unwrap_or_else(|_| app.shell().command("ffmpeg")).args(&args);
 
     let (mut rx, child) = match cmd.spawn().map_err(|e| e.to_string()) {
         Ok(pair) => pair,
@@ -788,6 +885,7 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
             let _ = windows::Win32::Foundation::CloseHandle(handle);
         }
     }
+    crate::hardware_profile::apply_process_ecoqos_and_affinity(child.pid(), prof.e_cores_mask);
 
     unsafe {
         use windows::Win32::System::Power::{
@@ -825,8 +923,8 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
                     chunk_accumulator.extend_from_slice(&bytes);
                     // Batch chunks into 64 KB or flush every 50ms to cut mutex locks & heap allocations by 98%
                     if chunk_accumulator.len() >= 64 * 1024 || last_flush.elapsed() >= std::time::Duration::from_millis(50) {
-                        let to_push = std::mem::take(&mut chunk_accumulator);
-                        push_video_chunk(to_push);
+                        let to_push = chunk_accumulator;
+                        chunk_accumulator = push_and_recycle_video_chunk(to_push);
                         last_flush = std::time::Instant::now();
                     }
                 }
@@ -1029,20 +1127,6 @@ pub async fn save_clip(
     let start_ts = extracted.start_ts;
     let end_ts = extracted.end_ts;
 
-    let temp_video_path = temp_dir.join(format!("temp_{}.ts", timestamp));
-    tokio::fs::write(&temp_video_path, extracted.data).await.map_err(|e| e.to_string())?;
-    
-    // RAII guard ensuring temporary video file is deleted even if FFmpeg remux fails
-    struct TempFileGuard(PathBuf);
-    impl Drop for TempFileGuard {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.0);
-        }
-    }
-    let _temp_video_guard = TempFileGuard(temp_video_path.clone());
-
-    // Dump audio tracks DIRECTLY into game_dir using the EXACT video start & end timestamps
-    // F-09: Dynamic A/V offset calibration accounting for pipeline jitter
     let base_audio_path = game_dir.join(format!("{}-{}", final_game_name, timestamp));
     let cfg = crate::config::get_config(app.clone());
     let calibrated_offset = cfg.audio_sync_offset_ms.clamp(-1000, 1000);
@@ -1070,7 +1154,8 @@ pub async fn save_clip(
         "-probesize".to_string(), "32".to_string(),
         "-analyzeduration".to_string(), "0".to_string(),
         "-fflags".to_string(), "+genpts+discardcorrupt".to_string(),
-        "-i".to_string(), temp_video_path.to_string_lossy().to_string(),
+        "-f".to_string(), "mpegts".to_string(),
+        "-i".to_string(), "pipe:0".to_string(),
     ];
 
     let is_hevc = matches!(cfg.video_codec, crate::config::VideoCodec::HEVC);
@@ -1132,14 +1217,26 @@ pub async fn save_clip(
         ]);
     }
 
-    let merge_cmd = app.shell().sidecar("ffmpeg").or_else(|_| app.shell().command("ffmpeg")).map_err(|e| e.to_string())?.args(merge_args);
-    let merge_output = merge_cmd.output().await.map_err(|e| e.to_string())?;
+    let ffmpeg_bin = resolve_ffmpeg_path();
+    let mut tokio_cmd = tokio::process::Command::new(ffmpeg_bin);
+    tokio_cmd.args(&merge_args);
+    tokio_cmd.stdin(std::process::Stdio::piped());
+    tokio_cmd.stdout(std::process::Stdio::piped());
+    tokio_cmd.stderr(std::process::Stdio::piped());
+    #[cfg(target_os = "windows")]
+    tokio_cmd.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+
+    let mut merge_child = tokio_cmd.spawn().map_err(|e| format!("Failed to spawn ffmpeg for clip merge: {e}"))?;
+    if let Some(mut stdin) = merge_child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        let _ = stdin.write_all(&extracted.data).await;
+        drop(stdin); // Flush & signal EOF to FFmpeg
+    }
+    let merge_output = merge_child.wait_with_output().await.map_err(|e| format!("FFmpeg merge wait failed: {e}"))?;
 
     if !merge_output.status.success() {
         return Err(String::from_utf8_lossy(&merge_output.stderr).into_owned());
     }
-
-    drop(_temp_video_guard);
 
     let duration_to_save = video_duration;
 
