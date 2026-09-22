@@ -86,6 +86,34 @@ fn test_performance_snapshot_serialization_roundtrip() {
         system_specs: specs,
         active_settings: settings,
         pipeline_diagnostics: diag,
+        last_clip_save_benchmark: None,
+        audio_telemetry: app_lib::audio_engine::AudioEngineTelemetry::default(),
+        os_scheduler: app_lib::performance::OsSchedulerDiagnostics {
+            process_priority: "Normal".to_string(),
+            thread_count: 12,
+            handle_count: 450,
+            is_eco_qos: false,
+            working_set_mb: 50.0,
+        },
+        gpu_memory: app_lib::performance::GpuMemoryDiagnostics {
+            adapter_name: "NVIDIA GeForce RTX 4070".to_string(),
+            vram_dedicated_mb: 8192.0,
+            vram_shared_mb: 120.0,
+            is_integrated: false,
+        },
+        memory_manager: app_lib::performance::MemoryManagerDiagnostics {
+            page_faults: 1520,
+            peak_working_set_mb: 85.0,
+        },
+        storage_media: app_lib::performance::StorageMediaDiagnostics {
+            drive_letter: "C:".to_string(),
+            drive_type: "NVMe SSD".to_string(),
+            is_ssd: true,
+        },
+        system_environment: app_lib::performance::SystemEnvironmentDiagnostics {
+            power_plan: "Höchstleistung".to_string(),
+            conflicting_recorders: Vec::new(),
+        },
         bottleneck_warnings: vec!["✅ Optimale Konfiguration".to_string()],
         processes: vec![metric],
     };

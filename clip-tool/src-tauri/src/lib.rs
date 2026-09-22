@@ -77,6 +77,7 @@ pub fn run() {
         recorder::get_buffer_state,
         recorder::get_last_error_log,
         recorder::save_clip_now,
+        recorder::get_last_save_benchmark,
         enable_autostart,
         disable_autostart,
         audio_engine::get_mic_level,

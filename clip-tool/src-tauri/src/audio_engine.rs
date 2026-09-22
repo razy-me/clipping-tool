@@ -139,6 +139,39 @@ fn is_silence(samples: &[f32]) -> bool {
     !samples.iter().any(|&s| s.abs() >= 0.0001)
 }
 
+static TOTAL_AUDIO_SAMPLES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static SILENCE_AUDIO_SAMPLES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static POOL_RECYCLED_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static POOL_ALLOC_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct AudioEngineTelemetry {
+    pub total_samples: u64,
+    pub silence_samples: u64,
+    pub silence_pct: f64,
+    pub pool_recycled: u64,
+    pub pool_allocs: u64,
+    pub pool_hit_rate_pct: f64,
+}
+
+pub fn get_audio_engine_telemetry() -> AudioEngineTelemetry {
+    use std::sync::atomic::Ordering;
+    let total = TOTAL_AUDIO_SAMPLES.load(Ordering::Relaxed);
+    let silence = SILENCE_AUDIO_SAMPLES.load(Ordering::Relaxed);
+    let recycled = POOL_RECYCLED_COUNT.load(Ordering::Relaxed);
+    let allocs = POOL_ALLOC_COUNT.load(Ordering::Relaxed);
+    let total_reqs = recycled + allocs;
+
+    AudioEngineTelemetry {
+        total_samples: total,
+        silence_samples: silence,
+        silence_pct: if total > 0 { ((silence as f64 / total as f64) * 100.0 * 10.0).round() / 10.0 } else { 0.0 },
+        pool_recycled: recycled,
+        pool_allocs: allocs,
+        pool_hit_rate_pct: if total_reqs > 0 { ((recycled as f64 / total_reqs as f64) * 100.0 * 10.0).round() / 10.0 } else { 0.0 },
+    }
+}
+
 pub struct AudioTrack {
     pub name: String,
     chunks: VecDeque<AudioChunk>,
@@ -146,6 +179,7 @@ pub struct AudioTrack {
     pub channels: u16,
     max_samples: usize,
     stored_samples: usize,
+    pool: Vec<Vec<f32>>,
 }
 
 impl AudioTrack {
@@ -159,6 +193,65 @@ impl AudioTrack {
             channels,
             max_samples,
             stored_samples: 0,
+            pool: Vec::with_capacity(32),
+        }
+    }
+
+    #[inline]
+    pub fn push_silence(&mut self, sample_count: usize, ts: std::time::Instant) {
+        if sample_count == 0 { return; }
+        use std::sync::atomic::Ordering;
+        TOTAL_AUDIO_SAMPLES.fetch_add(sample_count as u64, Ordering::Relaxed);
+        SILENCE_AUDIO_SAMPLES.fetch_add(sample_count as u64, Ordering::Relaxed);
+
+        let mut appended = false;
+        if let Some(last) = self.chunks.back_mut() {
+            if let AudioChunkData::Silence(ref mut count) = last.data {
+                *count += sample_count;
+                last.timestamp = ts;
+                appended = true;
+            }
+        }
+        if !appended {
+            self.chunks.push_back(AudioChunk {
+                data: AudioChunkData::Silence(sample_count),
+                timestamp: ts,
+            });
+        }
+
+        self.stored_samples += sample_count;
+        self.evict_excess();
+    }
+
+    #[inline]
+    fn evict_excess(&mut self) {
+        while self.stored_samples > self.max_samples {
+            match self.chunks.front_mut() {
+                Some(chunk) => {
+                    let chunk_len = chunk.len();
+                    if chunk_len <= self.stored_samples - self.max_samples {
+                        self.stored_samples -= chunk_len;
+                        if let Some(popped) = self.chunks.pop_front() {
+                            if let AudioChunkData::Samples(mut vec) = popped.data {
+                                if self.pool.len() < 32 {
+                                    vec.clear();
+                                    self.pool.push(vec);
+                                }
+                            }
+                        }
+                    } else {
+                        let excess = self.stored_samples - self.max_samples;
+                        if let AudioChunkData::Silence(ref mut count) = chunk.data {
+                            if *count > excess {
+                                *count -= excess;
+                                self.stored_samples -= excess;
+                            }
+                        }
+                        break;
+                    }
+                }
+                None => break,
+            }
         }
     }
 
@@ -169,21 +262,11 @@ impl AudioTrack {
         let is_silent = is_silence(data);
 
         if is_silent {
-            let mut appended = false;
-            if let Some(last) = self.chunks.back_mut() {
-                if let AudioChunkData::Silence(ref mut count) = last.data {
-                    *count += data.len();
-                    last.timestamp = ts;
-                    appended = true;
-                }
-            }
-            if !appended {
-                self.chunks.push_back(AudioChunk {
-                    data: AudioChunkData::Silence(data.len()),
-                    timestamp: ts,
-                });
-            }
+            self.push_silence(data.len(), ts);
+            return;
         } else {
+            use std::sync::atomic::Ordering;
+            TOTAL_AUDIO_SAMPLES.fetch_add(data.len() as u64, Ordering::Relaxed);
             let spf = (self.sample_rate as usize * self.channels as usize).max(1);
             let max_chunk_samples = spf; // ~1000ms (1.0s) coalesce limit: slashes heap chunk allocations by 90%
 
@@ -199,35 +282,26 @@ impl AudioTrack {
             }
 
             if !appended {
+                let mut vec = match self.pool.pop() {
+                    Some(v) => {
+                        POOL_RECYCLED_COUNT.fetch_add(1, Ordering::Relaxed);
+                        v
+                    }
+                    None => {
+                        POOL_ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+                        Vec::with_capacity(max_chunk_samples)
+                    }
+                };
+                vec.extend_from_slice(data);
                 self.chunks.push_back(AudioChunk {
-                    data: AudioChunkData::Samples(data.to_vec()),
+                    data: AudioChunkData::Samples(vec),
                     timestamp: ts,
                 });
             }
         }
 
         self.stored_samples += data.len();
-        while self.stored_samples > self.max_samples {
-            match self.chunks.front_mut() {
-                Some(chunk) => {
-                    let chunk_len = chunk.len();
-                    if chunk_len <= self.stored_samples - self.max_samples {
-                        self.stored_samples -= chunk_len;
-                        self.chunks.pop_front();
-                    } else {
-                        let excess = self.stored_samples - self.max_samples;
-                        if let AudioChunkData::Silence(ref mut count) = chunk.data {
-                            if *count > excess {
-                                *count -= excess;
-                                self.stored_samples -= excess;
-                            }
-                        }
-                        break;
-                    }
-                }
-                None => break,
-            }
-        }
+        self.evict_excess();
     }
 
     #[inline]
@@ -383,8 +457,7 @@ pub fn calibrate_window(
 
         // VAD / Noise-gate: If RMS is below ambient background floor (< 0.0015), zero out silence to eliminate hiss & noise
         if rms < 0.0015 {
-            let silence = vec![0.0f32; samples.len()];
-            self.push_raw(&silence);
+            self.push_silence(samples.len(), std::time::Instant::now());
         } else {
             self.push_raw(samples);
         }
@@ -1020,27 +1093,32 @@ pub fn write_wav_f32(path: &PathBuf, sample_rate: u32, channels: u16, samples: &
     use std::io::Write;
 
     let data_len = (samples.len() * 4) as u32;
-    let mut out = Vec::with_capacity(data_len as usize + 44);
+    let mut header = [0u8; 44];
 
-    out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(36u32 + data_len).to_le_bytes());
-    out.extend_from_slice(b"WAVE");
-    out.extend_from_slice(b"fmt ");
-    out.extend_from_slice(&16u32.to_le_bytes());          // fmt chunk size
-    out.extend_from_slice(&3u16.to_le_bytes());           // IEEE float
-    out.extend_from_slice(&channels.to_le_bytes());
-    out.extend_from_slice(&sample_rate.to_le_bytes());
-    out.extend_from_slice(&(sample_rate * channels as u32 * 4).to_le_bytes());
-    out.extend_from_slice(&(channels * 4).to_le_bytes());
-    out.extend_from_slice(&32u16.to_le_bytes());          // bits per sample
-    out.extend_from_slice(b"data");
-    out.extend_from_slice(&data_len.to_le_bytes());
-    for s in samples {
-        out.extend_from_slice(&s.to_le_bytes());
-    }
+    header[0..4].copy_from_slice(b"RIFF");
+    header[4..8].copy_from_slice(&(36u32 + data_len).to_le_bytes());
+    header[8..12].copy_from_slice(b"WAVE");
+    header[12..16].copy_from_slice(b"fmt ");
+    header[16..20].copy_from_slice(&16u32.to_le_bytes());          // fmt chunk size
+    header[20..22].copy_from_slice(&3u16.to_le_bytes());           // IEEE float
+    header[22..24].copy_from_slice(&channels.to_le_bytes());
+    header[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+    header[28..32].copy_from_slice(&(sample_rate * channels as u32 * 4).to_le_bytes());
+    header[32..34].copy_from_slice(&(channels * 4).to_le_bytes());
+    header[34..36].copy_from_slice(&32u16.to_le_bytes());          // bits per sample
+    header[36..40].copy_from_slice(b"data");
+    header[40..44].copy_from_slice(&data_len.to_le_bytes());
 
-    let mut file = std::fs::File::create(path)?;
-    file.write_all(&out)
+    let file = std::fs::File::create(path)?;
+    let mut writer = std::io::BufWriter::with_capacity(64 * 1024, file);
+    writer.write_all(&header)?;
+
+    // Float32 on little-endian x86_64 / aarch64 is in IEEE-754 format matching WAV data chunk
+    let byte_slice = unsafe {
+        std::slice::from_raw_parts(samples.as_ptr() as *const u8, samples.len() * std::mem::size_of::<f32>())
+    };
+    writer.write_all(byte_slice)?;
+    writer.flush()
 }
 
 pub fn dump_audio_clips(

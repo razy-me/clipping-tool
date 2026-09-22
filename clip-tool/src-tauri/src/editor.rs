@@ -136,8 +136,17 @@ async fn serve_range(path: PathBuf, headers: &HeaderMap, content_type: &str) -> 
         if start >= total {
             return StatusCode::RANGE_NOT_SATISFIABLE.into_response();
         }
-        // Allow up to 32MB chunks for fast video buffering in browser
-        end_incl = end_incl.min(start + 32_000_000 - 1).min(total.saturating_sub(1));
+    }
+
+    // Cap chunk size to 2MB: keeps RAM consumption flat during timeline scrubbing
+    // and eliminates large heap allocations.
+    const MAX_CHUNK: u64 = 2_000_000;
+    if is_range {
+        end_incl = end_incl.min(start + MAX_CHUNK - 1).min(total.saturating_sub(1));
+    } else if total > MAX_CHUNK {
+        is_range = true;
+        start = 0;
+        end_incl = MAX_CHUNK - 1;
     }
 
     let Ok(mut file) = tokio::fs::File::open(&path).await else {

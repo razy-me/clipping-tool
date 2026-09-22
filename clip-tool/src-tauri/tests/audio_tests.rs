@@ -72,8 +72,11 @@ fn test_mic_volume_clamping_ranges() {
     set_mic_volume(1.0); // restore
 }
 
+static MIC_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn test_mic_push_raw_silence_and_decay() {
+    let _guard = MIC_TEST_LOCK.lock().unwrap();
     set_mic_volume(1.0);
     let mut track = AudioTrack::new("MicSilence".to_string(), 48000, 1, 10);
     let silence = vec![0.0f32; 4800];
@@ -88,6 +91,7 @@ fn test_mic_push_raw_silence_and_decay() {
 
 #[test]
 fn test_mic_push_raw_clipping_signals() {
+    let _guard = MIC_TEST_LOCK.lock().unwrap();
     set_mic_volume(1.0);
     let mut track = AudioTrack::new("MicClipping".to_string(), 48000, 1, 10);
     let loud = vec![1.5f32; 4800]; // Loud clipped audio

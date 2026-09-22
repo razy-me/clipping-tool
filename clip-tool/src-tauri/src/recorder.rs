@@ -314,6 +314,11 @@ impl InMemoryVideoBuffer {
     }
 
     pub fn push_chunk(&mut self, data: Vec<u8>) {
+        let is_key = is_ts_keyframe(&data);
+        self.push_chunk_with_keyframe(data, is_key);
+    }
+
+    pub fn push_chunk_with_keyframe(&mut self, data: Vec<u8>, is_key: bool) {
         let len = data.len();
         if len == 0 || len > self.max_bytes { return; }
 
@@ -330,7 +335,6 @@ impl InMemoryVideoBuffer {
             }
         }
 
-        let is_key = is_ts_keyframe(&data);
         let now = std::time::Instant::now();
 
         self.current_bytes += len;
@@ -440,17 +444,19 @@ pub fn init_video_buffer(buffer_length_secs: u32, bitrate_str: &str, tier: crate
 }
 
 pub fn push_video_chunk(data: Vec<u8>) {
+    let is_key = is_ts_keyframe(&data);
     if let Ok(mut guard) = VIDEO_BUFFER.lock() {
         if let Some(buf) = guard.as_mut() {
-            buf.push_chunk(data);
+            buf.push_chunk_with_keyframe(data, is_key);
         }
     }
 }
 
 pub fn push_and_recycle_video_chunk(data: Vec<u8>) -> Vec<u8> {
+    let is_key = is_ts_keyframe(&data);
     if let Ok(mut guard) = VIDEO_BUFFER.lock() {
         if let Some(buf) = guard.as_mut() {
-            buf.push_chunk(data);
+            buf.push_chunk_with_keyframe(data, is_key);
             return buf.take_recycled_buffer(64 * 1024);
         }
     }
@@ -921,10 +927,25 @@ async fn start_pipeline(app: AppHandle) -> Result<(), String> {
                         AUTO_RESTARTS.store(0, std::sync::atomic::Ordering::Relaxed);
                     }
                     chunk_accumulator.extend_from_slice(&bytes);
-                    // Batch chunks into 64 KB or flush every 50ms to cut mutex locks & heap allocations by 98%
-                    if chunk_accumulator.len() >= 64 * 1024 || last_flush.elapsed() >= std::time::Duration::from_millis(50) {
-                        let to_push = chunk_accumulator;
-                        chunk_accumulator = push_and_recycle_video_chunk(to_push);
+                    // Batch chunks into 188-byte aligned TS packets (~65 KB = 348 * 188 = 65,424 B)
+                    // or flush on 50ms interval if aligned packets exist, leaving sub-packet remnants in accumulator.
+                    const TS_PACKET_SIZE: usize = 188;
+                    let aligned_len = (chunk_accumulator.len() / TS_PACKET_SIZE) * TS_PACKET_SIZE;
+                    if aligned_len >= 348 * TS_PACKET_SIZE || (aligned_len > 0 && last_flush.elapsed() >= std::time::Duration::from_millis(50)) {
+                        let to_push = if aligned_len == chunk_accumulator.len() {
+                            std::mem::take(&mut chunk_accumulator)
+                        } else {
+                            let remainder = chunk_accumulator.split_off(aligned_len);
+                            std::mem::replace(&mut chunk_accumulator, remainder)
+                        };
+                        let mut recycled = push_and_recycle_video_chunk(to_push);
+                        if chunk_accumulator.is_empty() {
+                            chunk_accumulator = recycled;
+                        } else {
+                            recycled.clear();
+                            recycled.extend_from_slice(&chunk_accumulator);
+                            chunk_accumulator = recycled;
+                        }
                         last_flush = std::time::Instant::now();
                     }
                 }
@@ -1082,13 +1103,32 @@ pub async fn save_clip_now(app: AppHandle) -> Result<(), String> {
     save_clip(app, game, cfg.buffer_length_secs, cfg.custom_clip_path).await
 }
 
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct ClipSaveBenchmark {
+    pub timestamp_epoch_ms: u64,
+    pub total_duration_ms: u64,
+    pub video_extract_ms: u64,
+    pub audio_dump_ms: u64,
+    pub ffmpeg_merge_ms: u64,
+    pub file_size_bytes: u64,
+    pub throughput_mbs: f64,
+    pub game_name: String,
+}
+
+static LAST_SAVE_BENCHMARK: std::sync::Mutex<Option<ClipSaveBenchmark>> = std::sync::Mutex::new(None);
+
 #[tauri::command]
+pub fn get_last_save_benchmark() -> Option<ClipSaveBenchmark> {
+    LAST_SAVE_BENCHMARK.lock().ok().and_then(|g| g.clone())
+}
+
 pub async fn save_clip(
     app: AppHandle,
     game_name: String,
     buffer_length_secs: u32,
     save_path: String,
 ) -> Result<(), String> {
+    let t_start = std::time::Instant::now();
     if SAVE_IN_FLIGHT.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return Err("A clip save is already in progress".into());
     }
@@ -1119,7 +1159,9 @@ pub async fn save_clip(
     let final_clip_path = game_dir.join(format!("{}-{}.mp4", final_game_name, timestamp));
 
     // Extract video data from memory buffer
+    let t_before_extract = std::time::Instant::now();
     let extracted = extract_video_buffer(buffer_length_secs as f64)?;
+    let video_extract_ms = t_before_extract.elapsed().as_millis() as u64;
     if extracted.data.is_empty() {
         return Err("Video buffer has not received frames yet".into());
     }
@@ -1130,6 +1172,7 @@ pub async fn save_clip(
     let base_audio_path = game_dir.join(format!("{}-{}", final_game_name, timestamp));
     let cfg = crate::config::get_config(app.clone());
     let calibrated_offset = cfg.audio_sync_offset_ms.clamp(-1000, 1000);
+    let t_before_audio = std::time::Instant::now();
     let dumped_audio = dump_audio_clips(base_audio_path, start_ts, end_ts, calibrated_offset).unwrap_or_else(|e| {
         println!("[audio] note: no audio tracks saved ({e}), exporting video-only");
         crate::audio_engine::DumpedAudioResult {
@@ -1137,6 +1180,7 @@ pub async fn save_clip(
             spike_markers: Vec::new(),
         }
     });
+    let audio_dump_ms = t_before_audio.elapsed().as_millis() as u64;
     // F-10: Play audible confirmation sound only AFTER audio window has been extracted
     // so the beep sound never leaks into the recorded clip.
     crate::audio::play_notification_sound();
@@ -1197,7 +1241,6 @@ pub async fn save_clip(
             "-max_muxing_queue_size".to_string(), "2048".to_string(),
             "-avoid_negative_ts".to_string(), "make_zero".to_string(),
             "-shortest".to_string(),
-            "-movflags".to_string(), "+faststart".to_string(),
             "-y".to_string(),
             final_clip_path.to_string_lossy().to_string(),
         ]);
@@ -1211,7 +1254,6 @@ pub async fn save_clip(
         merge_args.extend([
             "-max_muxing_queue_size".to_string(), "2048".to_string(),
             "-avoid_negative_ts".to_string(), "make_zero".to_string(),
-            "-movflags".to_string(), "+faststart".to_string(),
             "-y".to_string(),
             final_clip_path.to_string_lossy().to_string(),
         ]);
@@ -1221,24 +1263,56 @@ pub async fn save_clip(
     let mut tokio_cmd = tokio::process::Command::new(ffmpeg_bin);
     tokio_cmd.args(&merge_args);
     tokio_cmd.stdin(std::process::Stdio::piped());
-    tokio_cmd.stdout(std::process::Stdio::piped());
+    tokio_cmd.stdout(std::process::Stdio::null());
     tokio_cmd.stderr(std::process::Stdio::piped());
     #[cfg(target_os = "windows")]
     tokio_cmd.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
 
+    let t_before_merge = std::time::Instant::now();
     let mut merge_child = tokio_cmd.spawn().map_err(|e| format!("Failed to spawn ffmpeg for clip merge: {e}"))?;
-    if let Some(mut stdin) = merge_child.stdin.take() {
-        use tokio::io::AsyncWriteExt;
-        let _ = stdin.write_all(&extracted.data).await;
-        drop(stdin); // Flush & signal EOF to FFmpeg
-    }
+    let mut stdin_opt = merge_child.stdin.take();
+    let write_task = tokio::spawn(async move {
+        if let Some(mut stdin) = stdin_opt.take() {
+            use tokio::io::AsyncWriteExt;
+            let _ = stdin.write_all(&extracted.data).await;
+            drop(stdin); // Flush & signal EOF to FFmpeg
+        }
+    });
+
     let merge_output = merge_child.wait_with_output().await.map_err(|e| format!("FFmpeg merge wait failed: {e}"))?;
+    let _ = write_task.await;
+    let ffmpeg_merge_ms = t_before_merge.elapsed().as_millis() as u64;
 
     if !merge_output.status.success() {
         return Err(String::from_utf8_lossy(&merge_output.stderr).into_owned());
     }
 
     let duration_to_save = video_duration;
+
+    let total_duration_ms = t_start.elapsed().as_millis() as u64;
+    let file_size_bytes = std::fs::metadata(&final_clip_path).map(|m| m.len()).unwrap_or(0);
+    let throughput_mbs = if total_duration_ms > 0 {
+        (file_size_bytes as f64 / (1024.0 * 1024.0)) / (total_duration_ms as f64 / 1000.0)
+    } else {
+        0.0
+    };
+
+    let bench = ClipSaveBenchmark {
+        timestamp_epoch_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0),
+        total_duration_ms,
+        video_extract_ms,
+        audio_dump_ms,
+        ffmpeg_merge_ms,
+        file_size_bytes,
+        throughput_mbs: (throughput_mbs * 10.0).round() / 10.0,
+        game_name: final_game_name.clone(),
+    };
+    if let Ok(mut g) = LAST_SAVE_BENCHMARK.lock() {
+        *g = Some(bench);
+    }
 
     // Generate thumbnail in background so save_clip returns immediately!
     let app_preview = app.clone();

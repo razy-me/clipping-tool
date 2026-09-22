@@ -10,21 +10,38 @@ use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThre
 
 use rodio::source::{SineWave, Source};
 
+use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::OnceLock;
+
+static SOUND_SENDER: OnceLock<SyncSender<()>> = OnceLock::new();
+
 pub fn play_notification_sound() {
-    std::thread::spawn(|| {
-        if let Ok(stream_handle) = OutputStreamBuilder::open_default_stream() {
-            let sink = Sink::connect_new(&stream_handle.mixer());
-            
-            // Warm, relaxed 2-note sound (C4 -> G4)
-            let note1 = SineWave::new(261.63).take_duration(std::time::Duration::from_millis(80)).amplify(0.12);
-            let note2 = SineWave::new(392.00).take_duration(std::time::Duration::from_millis(180)).amplify(0.15);
-
-            sink.append(note1);
-            sink.append(note2);
-
-            sink.sleep_until_end();
-        }
+    let tx = SOUND_SENDER.get_or_init(|| {
+        let (tx, rx) = sync_channel::<()>(4);
+        let _ = std::thread::Builder::new()
+            .name("clip-sound-worker".into())
+            .spawn(move || {
+                let stream_handle = match OutputStreamBuilder::open_default_stream() {
+                    Ok(h) => h,
+                    Err(e) => {
+                        eprintln!("[audio] Failed to open notification sound stream: {e}");
+                        return;
+                    }
+                };
+                while rx.recv().is_ok() {
+                    let sink = Sink::connect_new(&stream_handle.mixer());
+                    // Warm, relaxed 2-note sound (C4 -> G4)
+                    let note1 = SineWave::new(261.63).take_duration(std::time::Duration::from_millis(80)).amplify(0.12);
+                    let note2 = SineWave::new(392.00).take_duration(std::time::Duration::from_millis(180)).amplify(0.15);
+                    sink.append(note1);
+                    sink.append(note2);
+                    sink.sleep_until_end();
+                }
+            });
+        tx
     });
+
+    let _ = tx.try_send(());
 }
 
 pub fn get_active_game_name() -> String {

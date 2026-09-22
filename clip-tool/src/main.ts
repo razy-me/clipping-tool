@@ -302,7 +302,7 @@ async function restartIfRunning(): Promise<void> {
 function startBufferTicker(): void {
   if (bufferTicker !== null) clearInterval(bufferTicker);
   bufferTicker = setInterval(() => {
-    if (document.visibilityState === 'hidden' || !cfg) return;
+    if (document.visibilityState === 'hidden' || !cfg || currentView !== 'home') return;
 
     const maxLen = Math.max(1, cfg.buffer_length_secs);
     let currentSecs = 0;
@@ -687,7 +687,15 @@ async function renderLibrary(root: HTMLElement): Promise<void> {
 
   const search = $id<HTMLInputElement>('lib-search');
   search.value = libSearch;
-  search.addEventListener('input', () => { libSearch = search.value; paintLibrary(); });
+  let searchDebounceTimer: number | null = null;
+  search.addEventListener('input', () => {
+    libSearch = search.value;
+    if (searchDebounceTimer !== null) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = window.setTimeout(() => {
+      searchDebounceTimer = null;
+      paintLibrary();
+    }, 150);
+  });
 
   const sort = $id<HTMLSelectElement>('lib-sort');
   sort.value = libSort;
@@ -765,17 +773,23 @@ function paintLibrary(): void {
   wireCards(body);
 }
 
-// ── Card Interaction Wiring (Single-Click = Editor, Double-Click = Preview) ────
+// ── Card Interaction Wiring via Event Delegation (Single-Click = Vorschau, Double-Click = Editor) ────
+let libClickTimer: number | null = null;
 function wireCards(scope: HTMLElement): void {
-  scope.querySelectorAll<HTMLElement>('.clip-card').forEach((cardEl) => {
-    const path = cardEl.dataset.path!;
-    let clickTimer: number | null = null;
+  if (scope.dataset.delegated === 'true') return;
+  scope.dataset.delegated = 'true';
+
+  scope.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
 
     // Favorite Star Click
-    const favBtn = cardEl.querySelector('.card-fav-btn');
-    favBtn?.addEventListener('click', async (e) => {
+    const favBtn = target.closest<HTMLButtonElement>('.card-fav-btn');
+    if (favBtn) {
       e.stopPropagation();
       e.preventDefault();
+      const card = favBtn.closest<HTMLElement>('.clip-card');
+      const path = card?.dataset.path;
+      if (!path) return;
       try {
         const nowFav = await invoke<boolean>('toggle_favorite', { path });
         favBtn.classList.toggle('is-fav', nowFav);
@@ -784,13 +798,17 @@ function wireCards(scope: HTMLElement): void {
       } catch (err) {
         toast(String(err), 'error');
       }
-    });
+      return;
+    }
 
     // Delete Button Click
-    const delBtn = cardEl.querySelector('.card-del-btn');
-    delBtn?.addEventListener('click', (e) => {
+    const delBtn = target.closest<HTMLButtonElement>('.card-del-btn');
+    if (delBtn) {
       e.stopPropagation();
       e.preventDefault();
+      const card = delBtn.closest<HTMLElement>('.clip-card');
+      const path = card?.dataset.path;
+      if (!path) return;
       confirmModal('Diesen Clip löschen?', 'Die Datei und zugehörige Audiospuren werden in den Papierkorb verschoben.', async () => {
         try {
           await invoke('delete_clip', { path });
@@ -810,49 +828,61 @@ function wireCards(scope: HTMLElement): void {
           }
         }
       });
-    });
+      return;
+    }
 
     // Quick Copy Button Click
-    const copyBtn = cardEl.querySelector('.card-copy-btn');
-    copyBtn?.addEventListener('click', async (e) => {
+    const copyBtn = target.closest<HTMLButtonElement>('.card-copy-btn');
+    if (copyBtn) {
       e.stopPropagation();
       e.preventDefault();
+      const card = copyBtn.closest<HTMLElement>('.clip-card');
+      const path = card?.dataset.path;
+      if (!path) return;
       try {
         await invoke('copy_clip_to_clipboard', { path });
         toast('Clip in Zwischenablage kopiert! 📋 (Strg+V)', 'success');
       } catch (err) {
         toast(String(err), 'error');
       }
-    });
+      return;
+    }
 
-    // Single Click (In-App Vorschau) vs Double Click (Web-Editor)
-    cardEl.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('.card-fav-btn, .card-del-btn, .card-copy-btn')) return;
-      if (clickTimer !== null) {
-        clearTimeout(clickTimer);
-        clickTimer = null;
+    // Card Single-Click (In-App Vorschau)
+    const cardEl = target.closest<HTMLElement>('.clip-card');
+    if (cardEl) {
+      const path = cardEl.dataset.path;
+      if (!path) return;
+      if (libClickTimer !== null) {
+        clearTimeout(libClickTimer);
+        libClickTimer = null;
       }
-      clickTimer = window.setTimeout(() => {
-        clickTimer = null;
+      libClickTimer = window.setTimeout(() => {
+        libClickTimer = null;
         const clip = libraryCache.find((c) => c.full_path === path);
         if (clip) {
           openPreviewModal(clip);
         }
       }, 230);
-    });
+    }
+  });
 
-    cardEl.addEventListener('dblclick', (e) => {
-      if ((e.target as HTMLElement).closest('.card-fav-btn, .card-del-btn, .card-copy-btn')) return;
-      if (clickTimer !== null) {
-        clearTimeout(clickTimer);
-        clickTimer = null;
-      }
-      const clip = libraryCache.find((c) => c.full_path === path);
-      if (clip) {
-        toast('Öffne Web-Editor…', 'info');
-        invoke('open_editor_window', { clip }).catch((err) => toast(String(err), 'error'));
-      }
-    });
+  scope.addEventListener('dblclick', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.card-fav-btn, .card-del-btn, .card-copy-btn')) return;
+    const cardEl = target.closest<HTMLElement>('.clip-card');
+    if (!cardEl) return;
+    const path = cardEl.dataset.path;
+    if (!path) return;
+    if (libClickTimer !== null) {
+      clearTimeout(libClickTimer);
+      libClickTimer = null;
+    }
+    const clip = libraryCache.find((c) => c.full_path === path);
+    if (clip) {
+      toast('Öffne Web-Editor…', 'info');
+      invoke('open_editor_window', { clip }).catch((err) => toast(String(err), 'error'));
+    }
   });
 }
 
@@ -1037,6 +1067,57 @@ interface PipelineDiagnostics {
   scaling_method: string;
 }
 
+interface ClipSaveBenchmark {
+  timestamp_epoch_ms: number;
+  total_duration_ms: number;
+  video_extract_ms: number;
+  audio_dump_ms: number;
+  ffmpeg_merge_ms: number;
+  file_size_bytes: number;
+  throughput_mbs: number;
+  game_name: string;
+}
+
+interface AudioEngineTelemetry {
+  total_samples: number;
+  silence_samples: number;
+  silence_pct: number;
+  pool_recycled: number;
+  pool_allocs: number;
+  pool_hit_rate_pct: number;
+}
+
+interface OsSchedulerDiagnostics {
+  process_priority: string;
+  thread_count: number;
+  handle_count: number;
+  is_eco_qos: boolean;
+  working_set_mb: number;
+}
+
+interface GpuMemoryDiagnostics {
+  adapter_name: string;
+  vram_dedicated_mb: number;
+  vram_shared_mb: number;
+  is_integrated: boolean;
+}
+
+interface MemoryManagerDiagnostics {
+  page_faults: number;
+  peak_working_set_mb: number;
+}
+
+interface StorageMediaDiagnostics {
+  drive_letter: string;
+  drive_type: string;
+  is_ssd: boolean;
+}
+
+interface SystemEnvironmentDiagnostics {
+  power_plan: string;
+  conflicting_recorders: string[];
+}
+
 interface ToolPerformanceSnapshot {
   timestamp_ms: number;
   cpu_cores: number;
@@ -1055,6 +1136,13 @@ interface ToolPerformanceSnapshot {
   system_specs: SystemSpecs;
   active_settings: ActiveSettingsSnapshot;
   pipeline_diagnostics: PipelineDiagnostics;
+  last_clip_save_benchmark: ClipSaveBenchmark | null;
+  audio_telemetry: AudioEngineTelemetry;
+  os_scheduler: OsSchedulerDiagnostics;
+  gpu_memory: GpuMemoryDiagnostics;
+  memory_manager: MemoryManagerDiagnostics;
+  storage_media: StorageMediaDiagnostics;
+  system_environment: SystemEnvironmentDiagnostics;
   bottleneck_warnings: string[];
   processes: ProcessMetric[];
 }
@@ -1077,6 +1165,7 @@ interface PerfHistoryPoint {
 
 let perfIntervalMs = 1000;
 let perfPaused = false;
+let latestIpcLatencyMs = 0;
 let latestSnapshot: ToolPerformanceSnapshot | null = null;
 const perfHistory: PerfHistoryPoint[] = [];
 const TIME_WINDOW_MS = 60_000; // Immer exakt 60 Sekunden Zeitfenster
@@ -1339,7 +1428,9 @@ function renderPerformance(root: HTMLElement): void {
   const runPoll = async () => {
     if (perfPaused || currentView !== 'performance') return;
     try {
+      const t0 = performance.now();
       const snap = await invoke<ToolPerformanceSnapshot>('get_tool_performance');
+      latestIpcLatencyMs = Math.round(performance.now() - t0);
       latestSnapshot = snap;
 
       // Update Card Values
@@ -1592,6 +1683,54 @@ function renderPerformance(root: HTMLElement): void {
       ...snap.processes.map((p) =>
         `[PID ${p.pid}] ${p.name.padEnd(28)} | ${p.role.padEnd(35)} | CPU: ${p.cpu_usage_normalized.toFixed(1)}% (${p.cpu_usage.toFixed(1)}% Core) | RAM: ${p.memory_mb.toFixed(1)}MB | Commit: ${p.virtual_memory_mb.toFixed(1)}MB`
       ),
+      '',
+      '--- ⏱️ CLIP-SPEICHER-BENCHMARK (LETZTER GESPEICHERTER CLIP) ---',
+      ...(snap.last_clip_save_benchmark
+        ? [
+            `Ziel / Spiel:          ${snap.last_clip_save_benchmark.game_name}`,
+            `Gesamte Save-Dauer:    ${snap.last_clip_save_benchmark.total_duration_ms} ms`,
+            `Video-Pufferextraktion:${snap.last_clip_save_benchmark.video_extract_ms} ms`,
+            `Audio-WAV Export:      ${snap.last_clip_save_benchmark.audio_dump_ms} ms`,
+            `FFmpeg Muxing/Remux:   ${snap.last_clip_save_benchmark.ffmpeg_merge_ms} ms`,
+            `Dateigröße des Clips:  ${(snap.last_clip_save_benchmark.file_size_bytes / (1024 * 1024)).toFixed(2)} MB`,
+            `Schreibdurchsatz I/O:  ${snap.last_clip_save_benchmark.throughput_mbs.toFixed(1)} MB / Sekunde`,
+          ]
+        : ['• Noch kein Clip in dieser Sitzung gespeichert.']),
+      '',
+      '--- 🎙️ AUDIO-ENGINE & SPEICHER-RECYCLING TELEMETRIE ---',
+      `VAD-Stillequote:       ${snap.audio_telemetry.silence_pct.toFixed(1)} % (Zero-Allocation bei Sprechpausen)`,
+      `Chunk-Pool Hit-Rate:   ${snap.audio_telemetry.pool_hit_rate_pct.toFixed(1)} % Wiederverwendungsrate`,
+      `Recycelte Chunks:      ${snap.audio_telemetry.pool_recycled} Puffer (Zero-Allocation)`,
+      `Neu allokierte Chunks: ${snap.audio_telemetry.pool_allocs} Puffer`,
+      `Gesamt-Audio-Samples:  ${snap.audio_telemetry.total_samples.toLocaleString()} Samples`,
+      '',
+      '--- 🪟 WINDOWS OS & SCHEDULER-INTERNALS ---',
+      `Prozess-Priorität:     ${snap.os_scheduler.process_priority}`,
+      `Windows EcoQoS / Eco:  ${snap.os_scheduler.is_eco_qos ? '⚠️ AKTIV (Windows drosselt auf E-Cores!)' : 'Aus (Volle Prozessleistung)'}`,
+      `Aktive OS-Threads:     ${snap.os_scheduler.thread_count} Threads`,
+      `Offene Windows-Handles:${snap.os_scheduler.handle_count} Handles`,
+      '',
+      '--- ⚡ IPC & FRONTEND HEALTH ---',
+      `Tauri IPC Roundtrip:   ${latestIpcLatencyMs} ms`,
+      `Aktive DOM-Elemente:   ${document.getElementsByTagName('*').length} Knoten`,
+      '',
+      '--- 🎮 GPU & VRAM SPEICHER-DIAGNOSTIK (DXGI) ---',
+      `Grafikkarte:           ${snap.gpu_memory.adapter_name} (${snap.gpu_memory.is_integrated ? 'Integrierte iGPU' : 'Dedizierte dGPU'})`,
+      `Dedizierter VRAM:      ${snap.gpu_memory.vram_dedicated_mb.toFixed(0)} MB`,
+      `Shared System-RAM:     ${snap.gpu_memory.vram_shared_mb.toFixed(0)} MB (${snap.gpu_memory.is_integrated ? 'Normaler iGPU-Hauptspeicher' : 'Auslagerung'})`,
+      '',
+      '--- 💽 STORAGE- & LAUFWERKSBUS-DIAGNOSTIK ---',
+      `Ziel-Laufwerk:         ${snap.storage_media.drive_letter}`,
+      `Laufwerkstyp:          ${snap.storage_media.drive_type}`,
+      `High-Speed SSD:        ${snap.storage_media.is_ssd ? 'Ja (Optimale Latenz)' : '⚠️ Nein (Mechanisch/USB - Latenzbehaftet)'}`,
+      '',
+      '--- 🧠 WINDOWS MEMORY MANAGER (PAGE FAULTS & PEAK) ---',
+      `Seitenfehler (Faults): ${snap.memory_manager.page_faults.toLocaleString()} Zugriffe`,
+      `Historischer RAM-Peak: ${snap.memory_manager.peak_working_set_mb.toFixed(1)} MB (Peak Working Set)`,
+      '',
+      '--- ⚔️ SYSTEM-UMGEBUNG & RECORDER-KONFLIKTE ---',
+      `Windows-Energieplan:   ${snap.system_environment.power_plan}`,
+      `Parallele Recorder:    ${snap.system_environment.conflicting_recorders.length > 0 ? '⚠️ ' + snap.system_environment.conflicting_recorders.join(', ') : 'Keine Konflikte erkannt (Exklusiver Encoder-Zugriff)'}`,
     ];
 
     if (history.length > 0) {

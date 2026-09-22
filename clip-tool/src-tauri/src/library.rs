@@ -105,6 +105,8 @@ pub fn get_disk_space_info(app: AppHandle) -> DiskSpaceInfo {
 // Duration probing — ffprobe (precise JSON) with ffmpeg stderr fallback.
 // ──────────────────────────────────────────────────────────────────────────────
 pub async fn get_video_duration(app: &AppHandle, file_path: &str) -> f64 {
+    static FFPROBE_SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+    let _permit = FFPROBE_SEM.acquire().await.ok();
     let cmd = app.shell().sidecar("ffprobe").unwrap_or_else(|_| app.shell().command("ffprobe"));
     {
         let cmd = cmd.args(&[
@@ -151,6 +153,12 @@ pub async fn generate_preview(app: &AppHandle, video_path: &str, duration: f64) 
     let preview_buf = PathBuf::from(video_path).with_extension("jpg");
     let preview_str = preview_buf.to_string_lossy().to_string();
 
+    if preview_buf.exists() {
+        return Some(preview_str);
+    }
+
+    static FFMPEG_THUMBNAIL_SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+    let _permit = FFMPEG_THUMBNAIL_SEM.acquire().await.ok();
     if preview_buf.exists() {
         return Some(preview_str);
     }
@@ -259,19 +267,16 @@ pub async fn get_all_clips(app: AppHandle) -> Result<Vec<ClipItem>, String> {
         }
     }
 
-    // Enrich (sidecar metadata / duration probe / thumbnail) in parallel,
-    // capped so we never stampede ffmpeg.
+    // Enrich (sidecar metadata / duration probe / thumbnail) in parallel.
+    // Probing and thumbnailing use internal 4-permit semaphores so cached clips return immediately.
     let favorites = std::sync::Arc::new(load_favorites(&app));
-    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
     let app = std::sync::Arc::new(app);
 
     let mut tasks = Vec::with_capacity(pending.len());
     for p in pending {
-        let sem = sem.clone();
         let app = app.clone();
         let favorites = favorites.clone();
         tasks.push(tokio::spawn(async move {
-            let _permit = sem.acquire_owned().await.ok();
             enrich_clip(&app, p, &favorites).await
         }));
     }
